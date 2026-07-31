@@ -1,100 +1,128 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planner - Minha Carteira</title>
-
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planner Financeiro - Minha Carteira</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PLANNER FINANCEIRO</p>
+        <h1>Minha Carteira</h1>
+        <p class="subtitle">Cadastre posições, acompanhe o patrimônio e veja o resultado da carteira.</p>
+      </div>
+      <div class="status-pill">Salvamento automático</div>
+    </header>
 
-    <div class="container">
+    <section class="resumo" aria-label="Resumo da carteira">
+      <article class="card">
+        <span class="card-label">Valor investido</span>
+        <strong id="investido">R$ 0,00</strong>
+      </article>
 
-        <h1>PLANNER</h1>
-        <h2>Minha Carteira</h2>
+      <article class="card">
+        <span class="card-label">Valor de mercado</span>
+        <strong id="mercado">R$ 0,00</strong>
+      </article>
 
-        <div class="formulario">
+      <article class="card">
+        <span class="card-label">Lucro / Prejuízo</span>
+        <strong id="lucro">R$ 0,00</strong>
+      </article>
 
-            <select id="tipo">
-                <option>FII</option>
-                <option>Ação</option>
-                <option>ETF</option>
-                <option>BDR</option>
-                <option>Renda Fixa</option>
-            </select>
+      <article class="card">
+        <span class="card-label">Rentabilidade</span>
+        <strong id="rentabilidade">0,00%</strong>
+      </article>
+    </section>
 
-            <input type="text" id="ticker" placeholder="Ticker">
-
-            <input type="number" id="qtd" placeholder="Quantidade">
-
-            <input type="number" step="0.01" id="pm" placeholder="Preço Médio">
-
-            <input type="number" step="0.01" id="cotacao" placeholder="Cotação Atual">
-
-            <button id="btnAdicionar">
-                Adicionar Ativo
-            </button>
-
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Adicionar posição</h2>
+          <p>Compras repetidas do mesmo ticker são somadas e o preço médio é recalculado.</p>
         </div>
+      </div>
 
+      <form id="formAtivo" class="formulario">
+        <label>
+          <span>Tipo</span>
+          <select id="tipo">
+            <option>FII</option>
+            <option>Ação</option>
+            <option>ETF</option>
+            <option>BDR</option>
+            <option>Stock</option>
+            <option>ETF Internacional</option>
+            <option>Renda Fixa</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Ticker</span>
+          <input type="text" id="ticker" placeholder="Ex.: MXRF11" autocomplete="off">
+        </label>
+
+        <label>
+          <span>Quantidade</span>
+          <input type="number" min="0.000001" step="any" id="qtd" placeholder="Ex.: 10">
+        </label>
+
+        <label>
+          <span>Preço médio</span>
+          <input type="number" min="0" step="0.01" id="pm" placeholder="Ex.: 9,85">
+        </label>
+
+        <label>
+          <span>Cotação atual</span>
+          <input type="number" min="0" step="0.01" id="cotacao" placeholder="Ex.: 10,12">
+        </label>
+
+        <button id="btnAdicionar" type="submit">Adicionar ativo</button>
+      </form>
+
+      <p id="mensagem" class="mensagem" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading carteira-heading">
+        <div>
+          <h2>Posições da carteira</h2>
+          <p id="contadorAtivos">Nenhum ativo cadastrado</p>
+        </div>
+        <button id="btnLimparTudo" class="btn-secondary" type="button">Limpar carteira</button>
+      </div>
+
+      <div class="table-wrap">
         <table id="tabela">
-
-            <thead>
-
-                <tr>
-
-                    <th>Tipo</th>
-                    <th>Ticker</th>
-                    <th>Quantidade</th>
-                    <th>Preço Médio</th>
-                    <th>Cotação Atual</th>
-                    <th>Valor Investido</th>
-                    <th>Valor Mercado</th>
-                    <th>Lucro / Prejuízo</th>
-                    <th>Ações</th>
-
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-            </tbody>
-
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Ticker</th>
+              <th>Quantidade</th>
+              <th>Preço médio</th>
+              <th>Cotação atual</th>
+              <th>Valor investido</th>
+              <th>Valor de mercado</th>
+              <th>Resultado</th>
+              <th>Rentab.</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
         </table>
 
-        <div class="resumo">
-
-            <div class="card">
-
-                <h3>Valor Investido</h3>
-                <span id="investido">R$ 0,00</span>
-
-            </div>
-
-            <div class="card">
-
-                <h3>Valor de Mercado</h3>
-                <span id="mercado">R$ 0,00</span>
-
-            </div>
-
-            <div class="card">
-
-                <h3>Lucro / Prejuízo</h3>
-                <span id="lucro">R$ 0,00</span>
-
-            </div>
-
+        <div id="estadoVazio" class="empty-state">
+          <strong>Sua carteira ainda está vazia.</strong>
+          <span>Adicione o primeiro ativo no formulário acima.</span>
         </div>
+      </div>
+    </section>
+  </main>
 
-    </div>
-
-    <script src="app.js"></script>
-
+  <script src="app.js"></script>
 </body>
-
 </html>
