@@ -1,138 +1,208 @@
-const STORAGE_KEY = "planner_financeiro_carteira_v3";
-const LEGACY_KEY = "planner_financeiro_carteira_v2";
+const STORAGE_KEY = "planner";
 
-const form = document.getElementById("formAtivo");
-const corpoTabela = document.querySelector("#tabela tbody");
-const estadoVazio = document.getElementById("estadoVazio");
-const mensagem = document.getElementById("mensagem");
-const contadorAtivos = document.getElementById("contadorAtivos");
-const btnLimparTudo = document.getElementById("btnLimparTudo");
+const modal = document.getElementById("modal");
+const formAtivo = document.getElementById("formAtivo");
+const categoria = document.getElementById("cat");
+const moeda = document.getElementById("moeda");
+const ticker = document.getElementById("tic");
+const quantidade = document.getElementById("qtd");
+const precoMedio = document.getElementById("pm");
+const cotacao = document.getElementById("cot");
+const tabela = document.getElementById("tb");
 
-const campos = {
-  tipo: document.getElementById("tipo"),
-  moeda: document.getElementById("moeda"),
-  ticker: document.getElementById("ticker"),
-  quantidade: document.getElementById("qtd"),
-  precoMedio: document.getElementById("pm"),
-  cotacao: document.getElementById("cotacao"),
-};
+const valorInvestidoEl = document.getElementById("valorInvestido");
+const valorMercadoEl = document.getElementById("valorMercado");
+const lucroPrejuizoEl = document.getElementById("lucroPrejuizo");
 
-let carteira = carregarCarteira();
+let ativos = carregarAtivos();
 
-function formatarMoeda(valor, moeda) {
-  return Number(valor).toLocaleString("pt-BR", { style: "currency", currency: moeda });
-}
-function numero(valor, casas = 2) {
-  return Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: casas });
-}
-function percentual(valor) {
-  return `${Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-}
-function carregarCarteira() {
+function carregarAtivos() {
   try {
-    const atual = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (Array.isArray(atual)) return atual;
-    const anterior = JSON.parse(localStorage.getItem(LEGACY_KEY));
-    return Array.isArray(anterior) ? anterior.map(item => ({ ...item, moeda: item.moeda || "BRL" })) : [];
-  } catch { return []; }
+    const dados = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+
+    if (!Array.isArray(dados)) {
+      return [];
+    }
+
+    return dados.map((ativo) => {
+      const preco = Number(ativo.p ?? ativo.precoMedio ?? 0);
+
+      return {
+        t: String(ativo.t ?? ativo.ticker ?? "").toUpperCase(),
+        c: String(ativo.c ?? ativo.categoria ?? "FII"),
+        m: ativo.m ?? ativo.moeda ?? inferirMoeda(ativo.c ?? ativo.categoria),
+        q: Number(ativo.q ?? ativo.quantidade ?? 0),
+        p: preco,
+        cot: Number(ativo.cot ?? ativo.cotacao ?? preco)
+      };
+    });
+  } catch (erro) {
+    console.error("Não foi possível carregar a carteira:", erro);
+    return [];
+  }
 }
-function salvarCarteira() { localStorage.setItem(STORAGE_KEY, JSON.stringify(carteira)); }
-function mostrarMensagem(texto, erro = false) {
-  mensagem.textContent = texto;
-  mensagem.classList.toggle("erro", erro);
-  clearTimeout(mostrarMensagem.timer);
-  mostrarMensagem.timer = setTimeout(() => { mensagem.textContent = ""; mensagem.classList.remove("erro"); }, 3500);
+
+function inferirMoeda(tipo) {
+  return tipo === "Stock" || tipo === "ETF Internacional" ? "USD" : "BRL";
 }
-function ajustarMoedaPorTipo() {
-  campos.moeda.value = (campos.tipo.value === "Stock" || campos.tipo.value === "ETF Internacional") ? "USD" : "BRL";
+
+function formatarMoeda(valor, codigoMoeda) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: codigoMoeda,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(valor);
 }
-function lerFormulario() {
-  return {
-    tipo: campos.tipo.value,
-    moeda: campos.moeda.value,
-    ticker: campos.ticker.value.trim().toUpperCase(),
-    quantidade: Number(campos.quantidade.value),
-    precoMedio: Number(campos.precoMedio.value),
-    cotacao: Number(campos.cotacao.value),
+
+function descricaoMoeda(codigoMoeda) {
+  return codigoMoeda === "USD" ? "🇺🇸 Dólar (US$)" : "🇧🇷 Real (R$)";
+}
+
+function classeResultado(valor) {
+  if (valor > 0) return "positive";
+  if (valor < 0) return "negative";
+  return "neutral";
+}
+
+function salvarLocalmente() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(ativos));
+}
+
+function atualizar() {
+  tabela.innerHTML = "";
+
+  let totalInvestidoBRL = 0;
+  let totalMercadoBRL = 0;
+  let totalInvestidoUSD = 0;
+  let totalMercadoUSD = 0;
+
+  ativos.forEach((ativo) => {
+    const investido = ativo.q * ativo.p;
+    const mercado = ativo.q * ativo.cot;
+    const resultado = mercado - investido;
+
+    if (ativo.m === "USD") {
+      totalInvestidoUSD += investido;
+      totalMercadoUSD += mercado;
+    } else {
+      totalInvestidoBRL += investido;
+      totalMercadoBRL += mercado;
+    }
+
+    const linha = document.createElement("tr");
+    linha.innerHTML = `
+      <td>${ativo.t}</td>
+      <td>${ativo.c}</td>
+      <td>${descricaoMoeda(ativo.m)}</td>
+      <td>${ativo.q.toLocaleString("pt-BR")}</td>
+      <td>${formatarMoeda(ativo.p, ativo.m)}</td>
+      <td>${formatarMoeda(ativo.cot, ativo.m)}</td>
+      <td>${formatarMoeda(investido, ativo.m)}</td>
+      <td>${formatarMoeda(mercado, ativo.m)}</td>
+      <td class="${classeResultado(resultado)}">${formatarMoeda(resultado, ativo.m)}</td>
+    `;
+    tabela.appendChild(linha);
+  });
+
+  const possuiBRL = ativos.some((ativo) => ativo.m === "BRL");
+  const possuiUSD = ativos.some((ativo) => ativo.m === "USD");
+
+  valorInvestidoEl.textContent = formatarResumo(
+    totalInvestidoBRL,
+    totalInvestidoUSD,
+    possuiBRL,
+    possuiUSD
+  );
+
+  valorMercadoEl.textContent = formatarResumo(
+    totalMercadoBRL,
+    totalMercadoUSD,
+    possuiBRL,
+    possuiUSD
+  );
+
+  const lucroBRL = totalMercadoBRL - totalInvestidoBRL;
+  const lucroUSD = totalMercadoUSD - totalInvestidoUSD;
+
+  lucroPrejuizoEl.textContent = formatarResumo(
+    lucroBRL,
+    lucroUSD,
+    possuiBRL,
+    possuiUSD
+  );
+
+  const resultadoConsolidadoSinal = lucroBRL + lucroUSD;
+  lucroPrejuizoEl.className = classeResultado(resultadoConsolidadoSinal);
+
+  salvarLocalmente();
+}
+
+function formatarResumo(valorBRL, valorUSD, possuiBRL, possuiUSD) {
+  if (possuiBRL && possuiUSD) {
+    return `${formatarMoeda(valorBRL, "BRL")} · ${formatarMoeda(valorUSD, "USD")}`;
+  }
+
+  if (possuiUSD) {
+    return formatarMoeda(valorUSD, "USD");
+  }
+
+  return formatarMoeda(valorBRL, "BRL");
+}
+
+function ajustarMoedaPeloTipo() {
+  if (categoria.value === "Stock" || categoria.value === "ETF Internacional") {
+    moeda.value = "USD";
+  }
+}
+
+function limparFormulario() {
+  formAtivo.reset();
+  categoria.value = "FII";
+  moeda.value = "BRL";
+}
+
+document.getElementById("btnAdicionar").addEventListener("click", () => {
+  modal.showModal();
+});
+
+document.getElementById("btnCancelar").addEventListener("click", () => {
+  modal.close();
+  limparFormulario();
+});
+
+categoria.addEventListener("change", ajustarMoedaPeloTipo);
+
+formAtivo.addEventListener("submit", (evento) => {
+  evento.preventDefault();
+
+  const novoAtivo = {
+    t: ticker.value.trim().toUpperCase(),
+    c: categoria.value,
+    m: moeda.value,
+    q: Number(quantidade.value),
+    p: Number(precoMedio.value),
+    cot: Number(cotacao.value)
   };
-}
-function validarAtivo(a) {
-  if (!a.ticker) return "Informe o ticker.";
-  if (!Number.isFinite(a.quantidade) || a.quantidade <= 0) return "Informe uma quantidade maior que zero.";
-  if (!Number.isFinite(a.precoMedio) || a.precoMedio < 0) return "Informe um preço médio válido.";
-  if (!Number.isFinite(a.cotacao) || a.cotacao < 0) return "Informe uma cotação válida.";
-  return "";
-}
-function adicionarOuSomarAtivo(novo) {
-  const existente = carteira.find(i => i.ticker === novo.ticker && i.tipo === novo.tipo && (i.moeda || "BRL") === novo.moeda);
-  if (existente) {
-    const total = existente.quantidade + novo.quantidade;
-    existente.precoMedio = ((existente.quantidade * existente.precoMedio) + (novo.quantidade * novo.precoMedio)) / total;
-    existente.quantidade = total;
-    existente.cotacao = novo.cotacao;
-    mostrarMensagem(`${novo.ticker} atualizado e preço médio recalculado.`);
+
+  if (
+    !novoAtivo.t ||
+    novoAtivo.q <= 0 ||
+    novoAtivo.p < 0 ||
+    novoAtivo.cot < 0
+  ) {
+    alert("Preencha todos os campos com valores válidos.");
     return;
   }
-  carteira.push({ id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), ...novo });
-  mostrarMensagem(`${novo.ticker} adicionado em ${novo.moeda}.`);
-}
-function excluirAtivo(id) {
-  const ativo = carteira.find(i => i.id === id);
-  if (!ativo || !confirm(`Excluir ${ativo.ticker} da carteira?`)) return;
-  carteira = carteira.filter(i => i.id !== id);
-  salvarCarteira(); renderizar();
-}
-function editarAtivo(id) {
-  const a = carteira.find(i => i.id === id); if (!a) return;
-  campos.tipo.value = a.tipo; campos.moeda.value = a.moeda || "BRL"; campos.ticker.value = a.ticker;
-  campos.quantidade.value = a.quantidade; campos.precoMedio.value = a.precoMedio.toFixed(2); campos.cotacao.value = a.cotacao.toFixed(2);
-  carteira = carteira.filter(i => i.id !== id); salvarCarteira(); renderizar(); campos.ticker.focus();
-  mostrarMensagem(`Edite os dados de ${a.ticker} e clique em Adicionar ativo.`);
-}
-function renderizarTabela() {
-  corpoTabela.innerHTML = "";
-  carteira.slice().sort((a,b) => (a.moeda||"BRL").localeCompare(b.moeda||"BRL") || a.tipo.localeCompare(b.tipo) || a.ticker.localeCompare(b.ticker)).forEach(a => {
-    const moeda = a.moeda || "BRL", investido = a.quantidade * a.precoMedio, mercado = a.quantidade * a.cotacao;
-    const resultado = mercado - investido, rentabilidade = investido > 0 ? (resultado / investido) * 100 : 0, classe = resultado >= 0 ? "positivo" : "negativo";
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${a.tipo}</td><td><span class="moeda-badge ${moeda === "USD" ? "usd" : ""}">${moeda}</span></td><td class="ticker-cell">${a.ticker}</td><td>${numero(a.quantidade,6)}</td><td>${formatarMoeda(a.precoMedio,moeda)}</td><td>${formatarMoeda(a.cotacao,moeda)}</td><td>${formatarMoeda(investido,moeda)}</td><td>${formatarMoeda(mercado,moeda)}</td><td class="${classe}">${formatarMoeda(resultado,moeda)}</td><td class="${classe}">${percentual(rentabilidade)}</td><td><div class="acoes"><button class="btn-icon" data-editar="${a.id}">Editar</button><button class="btn-icon excluir" data-excluir="${a.id}">Excluir</button></div></td>`;
-    corpoTabela.appendChild(tr);
-  });
-  estadoVazio.classList.toggle("hidden", carteira.length > 0);
-  document.getElementById("tabela").classList.toggle("hidden", carteira.length === 0);
-}
-function totaisDaMoeda(moeda) {
-  return carteira.filter(i => (i.moeda || "BRL") === moeda).reduce((acc,i) => {
-    acc.investido += i.quantidade * i.precoMedio; acc.mercado += i.quantidade * i.cotacao; return acc;
-  }, { investido: 0, mercado: 0 });
-}
-function preencherResumo(moeda) {
-  const t = totaisDaMoeda(moeda), lucro = t.mercado - t.investido, rent = t.investido > 0 ? (lucro / t.investido) * 100 : 0;
-  const lucroEl = document.getElementById(`lucro${moeda}`), rentEl = document.getElementById(`rentabilidade${moeda}`);
-  document.getElementById(`investido${moeda}`).textContent = formatarMoeda(t.investido, moeda);
-  document.getElementById(`mercado${moeda}`).textContent = formatarMoeda(t.mercado, moeda);
-  lucroEl.textContent = formatarMoeda(lucro, moeda); rentEl.textContent = percentual(rent);
-  lucroEl.className = lucro >= 0 ? "positivo" : "negativo"; rentEl.className = lucro >= 0 ? "positivo" : "negativo";
-}
-function renderizarResumo() {
-  preencherResumo("BRL"); preencherResumo("USD");
-  contadorAtivos.textContent = carteira.length === 0 ? "Nenhum ativo cadastrado" : `${carteira.length} ${carteira.length === 1 ? "ativo cadastrado" : "ativos cadastrados"}`;
-}
-function renderizar() { renderizarTabela(); renderizarResumo(); }
 
-campos.tipo.addEventListener("change", ajustarMoedaPorTipo);
-form.addEventListener("submit", e => {
-  e.preventDefault(); const ativo = lerFormulario(), erro = validarAtivo(ativo);
-  if (erro) return mostrarMensagem(erro, true);
-  adicionarOuSomarAtivo(ativo); salvarCarteira(); renderizar();
-  campos.ticker.value = ""; campos.quantidade.value = ""; campos.precoMedio.value = ""; campos.cotacao.value = ""; campos.ticker.focus();
+  ativos.push(novoAtivo);
+  modal.close();
+  limparFormulario();
+  atualizar();
 });
-corpoTabela.addEventListener("click", e => {
-  const ed = e.target.closest("[data-editar]"), ex = e.target.closest("[data-excluir]");
-  if (ed) editarAtivo(ed.dataset.editar); if (ex) excluirAtivo(ex.dataset.excluir);
+
+modal.addEventListener("close", () => {
+  limparFormulario();
 });
-btnLimparTudo.addEventListener("click", () => {
-  if (!carteira.length || !confirm("Apagar todos os ativos da carteira?")) return;
-  carteira = []; salvarCarteira(); renderizar(); mostrarMensagem("Carteira apagada.");
-});
-adjustarMoedaPorTipo(); salvarCarteira(); renderizar();
+
+atualizar();

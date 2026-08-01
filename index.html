@@ -1,125 +1,128 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Planner Financeiro - Minha Carteira</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Planner</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="app-shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">PLANNER FINANCEIRO</p>
-        <h1>Minha Carteira</h1>
-        <p class="subtitle">Cadastre posições, acompanhe o patrimônio e veja o resultado da carteira.</p>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="planner-logo" aria-label="Planner">
+        <span class="planner-mark" aria-hidden="true">
+          <span class="mark-bar bar-1"></span>
+          <span class="mark-bar bar-2"></span>
+          <span class="mark-bar bar-3"></span>
+          <span class="mark-curve"></span>
+        </span>
+        <span class="planner-word">Planner</span>
       </div>
-      <div class="status-pill">Salvamento automático</div>
-    </header>
 
-    <section class="resumo" aria-label="Resumo da carteira">
-      <article class="card"><span class="card-label">Investido em reais</span><strong id="investidoBRL">R$ 0,00</strong></article>
-      <article class="card"><span class="card-label">Mercado em reais</span><strong id="mercadoBRL">R$ 0,00</strong></article>
-      <article class="card"><span class="card-label">Resultado em reais</span><strong id="lucroBRL">R$ 0,00</strong></article>
-      <article class="card"><span class="card-label">Rentabilidade em reais</span><strong id="rentabilidadeBRL">0,00%</strong></article>
-      <article class="card"><span class="card-label">Investido em dólares</span><strong id="investidoUSD">US$ 0,00</strong></article>
-      <article class="card"><span class="card-label">Mercado em dólares</span><strong id="mercadoUSD">US$ 0,00</strong></article>
-      <article class="card"><span class="card-label">Resultado em dólares</span><strong id="lucroUSD">US$ 0,00</strong></article>
-      <article class="card"><span class="card-label">Rentabilidade em dólares</span><strong id="rentabilidadeUSD">0,00%</strong></article>
-    </section>
+      <nav class="menu">
+        <a class="active" href="#">Dashboard</a>
+        <a href="#">Carteira</a>
+        <a href="#">FIIs</a>
+        <a href="#">Ações</a>
+        <a href="#">Stocks</a>
+        <a href="#">ETFs</a>
+        <a href="#">Dividendos</a>
+        <a href="#">Metas</a>
+      </nav>
+    </aside>
 
-    <section class="panel">
-      <div class="panel-heading">
+    <main class="main">
+      <div class="top">
         <div>
-          <h2>Adicionar posição</h2>
-          <p>Stocks e ETFs internacionais selecionam dólar automaticamente. Compras repetidas são somadas e o preço médio é recalculado.</p>
+          <h1>Dashboard</h1>
+          <small>Versão inicial evolutiva</small>
         </div>
+        <button type="button" id="btnAdicionar">+ Adicionar Ativo</button>
       </div>
 
-      <form id="formAtivo" class="formulario">
-        <label>
-          <span>Tipo</span>
-          <select id="tipo">
-            <option>FII</option>
-            <option>Ação</option>
-            <option>ETF</option>
-            <option>BDR</option>
-            <option>Stock</option>
-            <option>ETF Internacional</option>
-            <option>Renda Fixa</option>
-          </select>
-        </label>
-
-        <label>
-          <span>Moeda</span>
-          <select id="moeda">
-            <option value="BRL">Real (R$)</option>
-            <option value="USD">Dólar (US$)</option>
-          </select>
-        </label>
-
-        <label>
-          <span>Ticker</span>
-          <input type="text" id="ticker" placeholder="Ex.: MXRF11" autocomplete="off">
-        </label>
-
-        <label>
-          <span>Quantidade</span>
-          <input type="number" min="0.000001" step="any" id="qtd" placeholder="Ex.: 10">
-        </label>
-
-        <label>
-          <span>Preço médio</span>
-          <input type="number" min="0" step="0.01" id="pm" placeholder="Ex.: 9,85">
-        </label>
-
-        <label>
-          <span>Cotação atual</span>
-          <input type="number" min="0" step="0.01" id="cotacao" placeholder="Ex.: 10,12">
-        </label>
-
-        <button id="btnAdicionar" type="submit">Adicionar ativo</button>
-      </form>
-
-      <p id="mensagem" class="mensagem" role="status" aria-live="polite"></p>
-    </section>
-
-    <section class="panel">
-      <div class="panel-heading carteira-heading">
-        <div>
-          <h2>Posições da carteira</h2>
-          <p id="contadorAtivos">Nenhum ativo cadastrado</p>
+      <section class="cards">
+        <div class="card">
+          <small>Valor Investido</small>
+          <h2 id="valorInvestido">R$ 0,00</h2>
         </div>
-        <button id="btnLimparTudo" class="btn-secondary" type="button">Limpar carteira</button>
-      </div>
-
-      <div class="table-wrap">
-        <table id="tabela">
-          <thead>
-            <tr>
-              <th>Tipo</th>
-              <th>Moeda</th>
-              <th>Ticker</th>
-              <th>Quantidade</th>
-              <th>Preço médio</th>
-              <th>Cotação atual</th>
-              <th>Valor investido</th>
-              <th>Valor de mercado</th>
-              <th>Resultado</th>
-              <th>Rentab.</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-
-        <div id="estadoVazio" class="empty-state">
-          <strong>Sua carteira ainda está vazia.</strong>
-          <span>Adicione o primeiro ativo no formulário acima.</span>
+        <div class="card">
+          <small>Valor de Mercado</small>
+          <h2 id="valorMercado">R$ 0,00</h2>
         </div>
+        <div class="card">
+          <small>Lucro / Prejuízo</small>
+          <h2 id="lucroPrejuizo" class="neutral">R$ 0,00</h2>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="panel">
+          <h3>Carteira</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Categoria</th>
+                  <th>Moeda</th>
+                  <th>Qtd</th>
+                  <th>P. Médio</th>
+                  <th>Cotação</th>
+                  <th>Valor Investido</th>
+                  <th>Valor de Mercado</th>
+                  <th>Lucro / Prejuízo</th>
+                </tr>
+              </thead>
+              <tbody id="tb"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Evolução</h3>
+          <div class="chart">Gráfico será integrado</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="modal">
+    <form id="formAtivo">
+      <h3>Adicionar ativo</h3>
+
+      <label for="cat">Tipo</label>
+      <select id="cat" required>
+        <option value="FII">FII</option>
+        <option value="Ação">Ação</option>
+        <option value="Stock">Stock</option>
+        <option value="ETF Brasil">ETF Brasil</option>
+        <option value="ETF Internacional">ETF Internacional</option>
+      </select>
+
+      <label for="moeda">Moeda</label>
+      <select id="moeda" required>
+        <option value="BRL">🇧🇷 Real (R$)</option>
+        <option value="USD">🇺🇸 Dólar (US$)</option>
+      </select>
+
+      <label for="tic">Ticker</label>
+      <input id="tic" placeholder="Ticker (ex: KNRI11)" autocomplete="off" required>
+
+      <label for="qtd">Quantidade</label>
+      <input id="qtd" type="number" min="0" step="any" placeholder="Quantidade" required>
+
+      <label for="pm">Preço médio</label>
+      <input id="pm" type="number" min="0" step="0.01" placeholder="Preço médio" required>
+
+      <label for="cot">Cotação atual</label>
+      <input id="cot" type="number" min="0" step="0.01" placeholder="Cotação atual" required>
+
+      <div class="dialog-actions">
+        <button type="submit">Salvar</button>
+        <button type="button" class="secondary" id="btnCancelar">Cancelar</button>
       </div>
-    </section>
-  </main>
+    </form>
+  </dialog>
 
   <script src="app.js"></script>
 </body>
