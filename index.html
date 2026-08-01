@@ -18,32 +18,21 @@
     </header>
 
     <section class="resumo" aria-label="Resumo da carteira">
-      <article class="card">
-        <span class="card-label">Valor investido</span>
-        <strong id="investido">R$ 0,00</strong>
-      </article>
-
-      <article class="card">
-        <span class="card-label">Valor de mercado</span>
-        <strong id="mercado">R$ 0,00</strong>
-      </article>
-
-      <article class="card">
-        <span class="card-label">Lucro / Prejuízo</span>
-        <strong id="lucro">R$ 0,00</strong>
-      </article>
-
-      <article class="card">
-        <span class="card-label">Rentabilidade</span>
-        <strong id="rentabilidade">0,00%</strong>
-      </article>
+      <article class="card"><span class="card-label">Investido em reais</span><strong id="investidoBRL">R$ 0,00</strong></article>
+      <article class="card"><span class="card-label">Mercado em reais</span><strong id="mercadoBRL">R$ 0,00</strong></article>
+      <article class="card"><span class="card-label">Resultado em reais</span><strong id="lucroBRL">R$ 0,00</strong></article>
+      <article class="card"><span class="card-label">Rentabilidade em reais</span><strong id="rentabilidadeBRL">0,00%</strong></article>
+      <article class="card"><span class="card-label">Investido em dólares</span><strong id="investidoUSD">US$ 0,00</strong></article>
+      <article class="card"><span class="card-label">Mercado em dólares</span><strong id="mercadoUSD">US$ 0,00</strong></article>
+      <article class="card"><span class="card-label">Resultado em dólares</span><strong id="lucroUSD">US$ 0,00</strong></article>
+      <article class="card"><span class="card-label">Rentabilidade em dólares</span><strong id="rentabilidadeUSD">0,00%</strong></article>
     </section>
 
     <section class="panel">
       <div class="panel-heading">
         <div>
           <h2>Adicionar posição</h2>
-          <p>Compras repetidas do mesmo ticker são somadas e o preço médio é recalculado.</p>
+          <p>Stocks e ETFs internacionais selecionam dólar automaticamente. Compras repetidas são somadas e o preço médio é recalculado.</p>
         </div>
       </div>
 
@@ -58,6 +47,14 @@
             <option>Stock</option>
             <option>ETF Internacional</option>
             <option>Renda Fixa</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Moeda</span>
+          <select id="moeda">
+            <option value="BRL">Real (R$)</option>
+            <option value="USD">Dólar (US$)</option>
           </select>
         </label>
 
@@ -101,6 +98,7 @@
           <thead>
             <tr>
               <th>Tipo</th>
+              <th>Moeda</th>
               <th>Ticker</th>
               <th>Quantidade</th>
               <th>Preço médio</th>
