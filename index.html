@@ -21,27 +21,26 @@
       </div>
 
       <nav class="menu" aria-label="Menu principal">
-        <a class="active" href="#">Dashboard</a>
-        <a href="#">Carteira</a>
-        <a href="#">FIIs</a>
-        <a href="#">Ações</a>
-        <a href="#">Stocks</a>
-        <a href="#">ETFs</a>
-        <a href="#">Dividendos</a>
-        <a href="#">Metas</a>
+        <a class="active" href="#dashboard" data-view="dashboard">Dashboard</a>
+        <a href="#carteira" data-scroll="carteira">Carteira</a>
+        <a href="#renda-passiva" data-view="renda-passiva">Renda Passiva</a>
+        <a href="#" aria-disabled="true">Dividendos</a>
+        <a href="#" aria-disabled="true">Movimentações</a>
+        <a href="#" aria-disabled="true">Metas</a>
+        <a href="#" aria-disabled="true">Análises</a>
       </nav>
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Carteira local e privada</span>
+        <span>Versão 1.2 · Renda Passiva</span>
       </div>
     </aside>
 
     <main class="main">
       <header class="top">
         <div>
-          <h1>Dashboard</h1>
-          <small>Visão consolidada da sua carteira</small>
+          <h1 id="tituloPagina">Dashboard</h1>
+          <small id="subtituloPagina">Visão consolidada da sua carteira</small>
         </div>
 
         <div class="top-actions">
@@ -53,6 +52,7 @@
         </div>
       </header>
 
+      <div class="app-view active" id="viewDashboard">
       <section class="cards" aria-label="Resumo da carteira">
         <article class="card">
           <small>Valor Investido</small>
@@ -123,7 +123,7 @@
         </article>
       </section>
 
-      <section class="panel portfolio-panel">
+      <section class="panel portfolio-panel" id="carteira">
         <div class="panel-header portfolio-header">
           <div>
             <h3>Carteira</h3>
@@ -192,6 +192,145 @@
           <strong>Nenhum ativo encontrado.</strong>
           <span>Altere a busca, os filtros ou adicione um novo ativo.</span>
         </div>
+      </section>
+      </div>
+
+      <section class="app-view" id="viewRendaPassiva" hidden>
+        <section class="passive-summary" aria-label="Resumo da renda passiva">
+          <article class="card passive-card">
+            <small>Dividendos projetados — mês</small>
+            <h2 id="rendaMensalProjetada">R$ 0,00</h2>
+            <span class="card-detail" id="rendaMensalDetalhe">Estimativa pelos DYs cadastrados</span>
+          </article>
+
+          <article class="card passive-card">
+            <small>Dividendos projetados — ano</small>
+            <h2 id="rendaAnualProjetada">R$ 0,00</h2>
+            <span class="card-detail">Projeção para os próximos 12 meses</span>
+          </article>
+
+          <article class="card passive-card">
+            <small>Yield on Cost médio</small>
+            <h2 id="yocMedioCarteira">0,00%</h2>
+            <span class="card-detail">Renda projetada sobre o valor investido</span>
+          </article>
+
+          <article class="card passive-card">
+            <small>Meta mensal em Real</small>
+            <h2 id="metaMensalResumo">R$ 0,00</h2>
+            <span class="card-detail" id="metaMensalProgresso">Defina sua meta abaixo</span>
+          </article>
+        </section>
+
+        <section class="passive-grid">
+          <article class="panel projection-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Projeção de dividendos</h3>
+                <small>Estimativa mensal com reinvestimento dos rendimentos</small>
+              </div>
+              <select id="periodoProjecao" class="compact-select" aria-label="Período da projeção">
+                <option value="6">6 meses</option>
+                <option value="12" selected>12 meses</option>
+                <option value="24">24 meses</option>
+              </select>
+            </div>
+
+            <div class="projection-chart" id="graficoProjecao"></div>
+            <p class="calculation-note">
+              Projeção baseada no Dividend Yield anual informado em cada ativo. Não representa garantia de pagamento.
+            </p>
+          </article>
+
+          <article class="panel goal-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Meta de renda passiva</h3>
+                <small>Acompanhe a evolução da sua renda mensal</small>
+              </div>
+            </div>
+
+            <div class="goal-form">
+              <label>
+                <span>Objetivo mensal</span>
+                <input id="metaRendaMensal" type="number" min="0" step="100" placeholder="10000">
+              </label>
+              <label>
+                <span>Aporte mensal para simulação</span>
+                <input id="aporteMensal" type="number" min="0" step="100" placeholder="1000">
+              </label>
+            </div>
+
+            <div class="goal-values">
+              <div>
+                <span>Renda projetada hoje</span>
+                <strong id="rendaAtualMeta">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Falta para a meta</span>
+                <strong id="faltaMeta">R$ 0,00</strong>
+              </div>
+            </div>
+
+            <div class="goal-progress" aria-label="Progresso da meta">
+              <span id="barraMeta"></span>
+            </div>
+            <strong class="goal-percent" id="percentualMeta">0,00% da meta atingida</strong>
+          </article>
+        </section>
+
+        <section class="passive-grid lower-passive-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Simulador de reinvestimento</h3>
+                <small>Comparação da renda mensal com e sem reinvestir</small>
+              </div>
+            </div>
+
+            <div class="table-wrapper compact-table-wrapper">
+              <table class="passive-table simulation-table">
+                <thead>
+                  <tr>
+                    <th>Período</th>
+                    <th>Sem reinvestir</th>
+                    <th>Com reinvestimento</th>
+                    <th>Ganho adicional</th>
+                  </tr>
+                </thead>
+                <tbody id="tabelaReinvestimento"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Renda por ativo</h3>
+                <small>Dividend Yield e Yield on Cost projetados</small>
+              </div>
+            </div>
+
+            <div class="table-wrapper compact-table-wrapper">
+              <table class="passive-table">
+                <thead>
+                  <tr>
+                    <th>Ativo</th>
+                    <th>DY</th>
+                    <th>Yield on Cost</th>
+                    <th>Projeção/mês</th>
+                    <th>Projeção/ano</th>
+                  </tr>
+                </thead>
+                <tbody id="tabelaRendaAtivos"></tbody>
+              </table>
+            </div>
+            <div class="empty-state" id="rendaVazia" hidden>
+              <strong>Nenhum DY foi informado.</strong>
+              <span>Edite os ativos e preencha o Dividend Yield anual para gerar as projeções.</span>
+            </div>
+          </article>
+        </section>
       </section>
     </main>
   </div>

@@ -1,6 +1,7 @@
 const STORAGE_KEY = "planner";
 const THEME_KEY = "planner-theme";
-const BACKUP_VERSION = 2;
+const BACKUP_VERSION = 3;
+const PASSIVE_SETTINGS_KEY = "planner-passive-settings";
 
 const modal = document.getElementById("modal");
 const modalExcluir = document.getElementById("modalExcluir");
@@ -43,6 +44,31 @@ const btnTema = document.getElementById("btnTema");
 const iconeTema = document.getElementById("iconeTema");
 const textoTema = document.getElementById("textoTema");
 
+const menuViewLinks = document.querySelectorAll("[data-view]");
+const menuScrollLinks = document.querySelectorAll("[data-scroll]");
+const viewDashboard = document.getElementById("viewDashboard");
+const viewRendaPassiva = document.getElementById("viewRendaPassiva");
+const tituloPagina = document.getElementById("tituloPagina");
+const subtituloPagina = document.getElementById("subtituloPagina");
+const rendaMensalProjetada = document.getElementById("rendaMensalProjetada");
+const rendaMensalDetalhe = document.getElementById("rendaMensalDetalhe");
+const rendaAnualProjetada = document.getElementById("rendaAnualProjetada");
+const yocMedioCarteira = document.getElementById("yocMedioCarteira");
+const metaMensalResumo = document.getElementById("metaMensalResumo");
+const metaMensalProgresso = document.getElementById("metaMensalProgresso");
+const periodoProjecao = document.getElementById("periodoProjecao");
+const graficoProjecao = document.getElementById("graficoProjecao");
+const metaRendaMensal = document.getElementById("metaRendaMensal");
+const aporteMensal = document.getElementById("aporteMensal");
+const rendaAtualMeta = document.getElementById("rendaAtualMeta");
+const faltaMeta = document.getElementById("faltaMeta");
+const barraMeta = document.getElementById("barraMeta");
+const percentualMeta = document.getElementById("percentualMeta");
+const tabelaReinvestimento = document.getElementById("tabelaReinvestimento");
+const tabelaRendaAtivos = document.getElementById("tabelaRendaAtivos");
+const rendaVazia = document.getElementById("rendaVazia");
+
+
 const CORES_CATEGORIAS = [
   "#134e3a",
   "#caa13d",
@@ -60,6 +86,7 @@ let ativoParaExcluirId = null;
 let dadosImportacaoPendentes = null;
 let ordenacao = { campo: "t", direcao: "asc" };
 let toastTimeout = null;
+let passiveSettings = carregarConfiguracoesRenda();
 
 function criarId() {
   if (window.crypto?.randomUUID) {
@@ -321,6 +348,7 @@ function atualizar() {
   renderizarAlocacao();
 
   salvarLocalmente();
+  atualizarRendaPassiva();
 }
 
 function formatarResumo(valorBRL, valorUSD, possuiBRL, possuiUSD) {
@@ -625,6 +653,252 @@ function inicializarTema() {
   aplicarTema(temaSalvo || (prefereEscuro ? "dark" : "light"));
 }
 
+
+function carregarConfiguracoesRenda() {
+  try {
+    const dados = JSON.parse(localStorage.getItem(PASSIVE_SETTINGS_KEY) || "{}");
+    return {
+      metaMensal: numeroSeguro(dados.metaMensal, 10000),
+      aporteMensal: numeroSeguro(dados.aporteMensal, 1000)
+    };
+  } catch (erro) {
+    console.error("Não foi possível carregar as configurações de renda:", erro);
+    return { metaMensal: 10000, aporteMensal: 1000 };
+  }
+}
+
+function salvarConfiguracoesRenda() {
+  passiveSettings = {
+    metaMensal: numeroSeguro(metaRendaMensal.value),
+    aporteMensal: numeroSeguro(aporteMensal.value)
+  };
+  localStorage.setItem(PASSIVE_SETTINGS_KEY, JSON.stringify(passiveSettings));
+  atualizarRendaPassiva();
+}
+
+function obterDadosRendaPassiva() {
+  const dados = {
+    BRL: { mercado: 0, investido: 0, anual: 0, mensal: 0 },
+    USD: { mercado: 0, investido: 0, anual: 0, mensal: 0 }
+  };
+
+  ativos.forEach((ativo) => {
+    const grupo = dados[ativo.m] || dados.BRL;
+    const mercado = ativo.q * ativo.cot;
+    const investido = ativo.q * ativo.p;
+    const anual = mercado * (ativo.dy / 100);
+
+    grupo.mercado += mercado;
+    grupo.investido += investido;
+    grupo.anual += anual;
+    grupo.mensal += anual / 12;
+  });
+
+  Object.values(dados).forEach((grupo) => {
+    grupo.dyMedio = grupo.mercado > 0 ? (grupo.anual / grupo.mercado) * 100 : 0;
+    grupo.yoc = grupo.investido > 0 ? (grupo.anual / grupo.investido) * 100 : 0;
+    grupo.taxaMensal = grupo.mercado > 0 ? grupo.mensal / grupo.mercado : 0;
+  });
+
+  return dados;
+}
+
+function formatarLinhasMoeda(valorBRL, valorUSD) {
+  const linhas = [];
+  if (ativos.some((ativo) => ativo.m === "BRL")) linhas.push(formatarMoeda(valorBRL, "BRL"));
+  if (ativos.some((ativo) => ativo.m === "USD")) linhas.push(formatarMoeda(valorUSD, "USD"));
+  return linhas.length ? linhas.join(" · ") : formatarMoeda(0, "BRL");
+}
+
+function atualizarRendaPassiva() {
+  if (!rendaMensalProjetada) return;
+
+  const dados = obterDadosRendaPassiva();
+  const mensalBRL = dados.BRL.mensal;
+  const mensalUSD = dados.USD.mensal;
+  const anualBRL = dados.BRL.anual;
+  const anualUSD = dados.USD.anual;
+
+  rendaMensalProjetada.textContent = formatarLinhasMoeda(mensalBRL, mensalUSD);
+  rendaAnualProjetada.textContent = formatarLinhasMoeda(anualBRL, anualUSD);
+
+  const investidoTotalSinal = dados.BRL.investido + dados.USD.investido;
+  const rendaAnualSinal = dados.BRL.anual + dados.USD.anual;
+  const yocMedio = investidoTotalSinal > 0 ? (rendaAnualSinal / investidoTotalSinal) * 100 : 0;
+  yocMedioCarteira.textContent = formatarPercentual(yocMedio);
+
+  metaRendaMensal.value = passiveSettings.metaMensal || "";
+  aporteMensal.value = passiveSettings.aporteMensal || "";
+  metaMensalResumo.textContent = formatarMoeda(passiveSettings.metaMensal, "BRL");
+
+  const meta = passiveSettings.metaMensal;
+  const progresso = meta > 0 ? Math.min((mensalBRL / meta) * 100, 100) : 0;
+  const falta = Math.max(meta - mensalBRL, 0);
+
+  rendaAtualMeta.textContent = formatarMoeda(mensalBRL, "BRL");
+  faltaMeta.textContent = formatarMoeda(falta, "BRL");
+  barraMeta.style.width = `${progresso}%`;
+  percentualMeta.textContent = `${formatarPercentual(progresso)} da meta atingida`;
+  metaMensalProgresso.textContent =
+    meta > 0 ? `${formatarPercentual(progresso)} da meta mensal` : "Defina sua meta abaixo";
+
+  rendaMensalDetalhe.textContent =
+    ativos.some((ativo) => ativo.dy > 0)
+      ? "Estimativa pelos DYs cadastrados"
+      : "Preencha o DY anual dos ativos";
+
+  renderizarGraficoProjecao(dados);
+  renderizarSimulacaoReinvestimento(dados);
+  renderizarTabelaRendaAtivos();
+}
+
+function adicionarMes(data, quantidadeMeses) {
+  const novaData = new Date(data.getFullYear(), data.getMonth() + quantidadeMeses, 1);
+  return novaData.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" })
+    .replace(".", "")
+    .replace(" de ", "/");
+}
+
+function projetarRendaMensal(grupo, meses, aporte = 0, reinvestir = true) {
+  let patrimonio = grupo.mercado;
+  const taxaMensal = grupo.taxaMensal;
+  const valores = [];
+
+  for (let indice = 0; indice < meses; indice += 1) {
+    const renda = patrimonio * taxaMensal;
+    valores.push(renda);
+
+    if (reinvestir) {
+      patrimonio += renda + aporte;
+    } else {
+      patrimonio += aporte;
+    }
+  }
+
+  return valores;
+}
+
+function renderizarGraficoProjecao(dados) {
+  const meses = Number(periodoProjecao.value || 12);
+  const valores = projetarRendaMensal(
+    dados.BRL,
+    meses,
+    passiveSettings.aporteMensal,
+    true
+  );
+  const maiorValor = Math.max(...valores, 1);
+  const hoje = new Date();
+
+  graficoProjecao.innerHTML = valores.map((valor, indice) => {
+    const altura = Math.max((valor / maiorValor) * 100, valor > 0 ? 3 : 0);
+    return `
+      <div class="projection-column">
+        <span class="projection-value">${formatarMoeda(valor, "BRL")}</span>
+        <div class="projection-bar-wrap">
+          <span class="projection-bar" style="height:${altura}%"></span>
+        </div>
+        <span class="projection-month">${adicionarMes(hoje, indice + 1)}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function simularPeriodo(grupo, meses, aporte, reinvestir) {
+  let patrimonio = grupo.mercado;
+  const taxaMensal = grupo.taxaMensal;
+  let rendaMensal = patrimonio * taxaMensal;
+
+  for (let indice = 0; indice < meses; indice += 1) {
+    rendaMensal = patrimonio * taxaMensal;
+    patrimonio += aporte + (reinvestir ? rendaMensal : 0);
+  }
+
+  return patrimonio * taxaMensal;
+}
+
+function renderizarSimulacaoReinvestimento(dados) {
+  const periodos = [0, 12, 24, 36];
+  const aporte = passiveSettings.aporteMensal;
+
+  tabelaReinvestimento.innerHTML = periodos.map((meses) => {
+    const semReinvestir = meses === 0
+      ? dados.BRL.mensal
+      : simularPeriodo(dados.BRL, meses, aporte, false);
+    const comReinvestimento = meses === 0
+      ? dados.BRL.mensal
+      : simularPeriodo(dados.BRL, meses, aporte, true);
+    const diferenca = Math.max(comReinvestimento - semReinvestir, 0);
+
+    return `
+      <tr>
+        <td><strong>${meses === 0 ? "Hoje" : `${meses} meses`}</strong></td>
+        <td>${formatarMoeda(semReinvestir, "BRL")}</td>
+        <td>${formatarMoeda(comReinvestimento, "BRL")}</td>
+        <td class="${diferenca > 0 ? "positive" : "neutral"}">${formatarMoeda(diferenca, "BRL")}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderizarTabelaRendaAtivos() {
+  const ativosComRenda = ativos
+    .filter((ativo) => ativo.dy > 0)
+    .sort((a, b) => {
+      const rendaA = a.q * a.cot * (a.dy / 100);
+      const rendaB = b.q * b.cot * (b.dy / 100);
+      return rendaB - rendaA;
+    });
+
+  rendaVazia.hidden = ativosComRenda.length > 0;
+
+  tabelaRendaAtivos.innerHTML = ativosComRenda.map((ativo) => {
+    const mercado = ativo.q * ativo.cot;
+    const investido = ativo.q * ativo.p;
+    const rendaAnual = mercado * (ativo.dy / 100);
+    const rendaMensal = rendaAnual / 12;
+    const yoc = investido > 0 ? (rendaAnual / investido) * 100 : 0;
+
+    return `
+      <tr>
+        <td>
+          <div class="asset-income-name">
+            <strong>${escaparHtml(ativo.t)}</strong>
+            <small>${escaparHtml(ativo.c)}</small>
+          </div>
+        </td>
+        <td>${formatarPercentual(ativo.dy)}</td>
+        <td class="${classeResultado(yoc)}">${formatarPercentual(yoc)}</td>
+        <td>${formatarMoeda(rendaMensal, ativo.m)}</td>
+        <td>${formatarMoeda(rendaAnual, ativo.m)}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function abrirView(nomeView) {
+  const rendaAtiva = nomeView === "renda-passiva";
+
+  viewDashboard.hidden = rendaAtiva;
+  viewDashboard.classList.toggle("active", !rendaAtiva);
+  viewRendaPassiva.hidden = !rendaAtiva;
+  viewRendaPassiva.classList.toggle("active", rendaAtiva);
+
+  tituloPagina.textContent = rendaAtiva ? "Renda Passiva" : "Dashboard";
+  subtituloPagina.textContent = rendaAtiva
+    ? "Projeções simples para acompanhar sua renda e seus reinvestimentos"
+    : "Visão consolidada da sua carteira";
+
+  menuViewLinks.forEach((link) => {
+    link.classList.toggle("active", link.dataset.view === nomeView);
+  });
+
+  if (rendaAtiva) {
+    atualizarRendaPassiva();
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 document.getElementById("btnAdicionar").addEventListener("click", abrirModalNovoAtivo);
 document.getElementById("btnCancelar").addEventListener("click", fecharModalCadastro);
 document.getElementById("btnFecharModal").addEventListener("click", fecharModalCadastro);
@@ -633,6 +907,34 @@ document.getElementById("btnExportar").addEventListener("click", exportarBackup)
 document.getElementById("btnImportar").addEventListener("click", () => arquivoImportacao.click());
 document.getElementById("btnConfirmarImportacao").addEventListener("click", confirmarImportacao);
 document.getElementById("btnCancelarImportacao").addEventListener("click", cancelarImportacao);
+
+
+menuViewLinks.forEach((link) => {
+  link.addEventListener("click", (evento) => {
+    evento.preventDefault();
+    abrirView(link.dataset.view);
+    history.replaceState(null, "", link.getAttribute("href"));
+  });
+});
+
+menuScrollLinks.forEach((link) => {
+  link.addEventListener("click", (evento) => {
+    evento.preventDefault();
+    abrirView("dashboard");
+    document.getElementById(link.dataset.scroll)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  });
+});
+
+document.querySelectorAll('.menu a[aria-disabled="true"]').forEach((link) => {
+  link.addEventListener("click", (evento) => evento.preventDefault());
+});
+
+metaRendaMensal.addEventListener("change", salvarConfiguracoesRenda);
+aporteMensal.addEventListener("change", salvarConfiguracoesRenda);
+periodoProjecao.addEventListener("change", atualizarRendaPassiva);
 
 btnTema.addEventListener("click", () => {
   const temaAtual = document.documentElement.dataset.theme;
@@ -732,3 +1034,4 @@ modalImportacao.addEventListener("close", () => {
 
 inicializarTema();
 atualizar();
+abrirView(location.hash === "#renda-passiva" ? "renda-passiva" : "dashboard");

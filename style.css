@@ -929,3 +929,246 @@ dialog > select {
     bottom: 16px;
   }
 }
+
+
+/* ===== Planner v1.2 — Renda Passiva ===== */
+
+.menu a[aria-disabled="true"] {
+  opacity: 0.58;
+  cursor: default;
+}
+
+.app-view[hidden] {
+  display: none !important;
+}
+
+.app-view.active {
+  animation: viewFade 0.2s ease;
+}
+
+@keyframes viewFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.passive-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 20px 0 16px;
+}
+
+.passive-card h2 {
+  font-size: clamp(21px, 2vw, 28px);
+}
+
+.passive-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.75fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.lower-passive-grid {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.compact-select {
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--input);
+  color: var(--text);
+}
+
+.projection-chart {
+  height: 280px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 20px 8px 34px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.projection-column {
+  min-width: 46px;
+  height: 100%;
+  flex: 1 0 46px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.projection-value {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.projection-bar-wrap {
+  width: min(42px, 82%);
+  height: calc(100% - 40px);
+  display: flex;
+  align-items: flex-end;
+}
+
+.projection-bar {
+  width: 100%;
+  min-height: 3px;
+  border-radius: 7px 7px 2px 2px;
+  background: linear-gradient(180deg, #40bd7c, var(--green));
+  box-shadow: 0 5px 12px rgba(19, 78, 58, 0.16);
+  transition: height 0.25s ease;
+}
+
+.projection-month {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.calculation-note {
+  margin: 13px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.goal-form {
+  display: grid;
+  gap: 12px;
+}
+
+.goal-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.goal-form input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--input);
+  color: var(--text);
+}
+
+.goal-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 18px 0 14px;
+}
+
+.goal-values div {
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--green-soft);
+}
+
+.goal-values span,
+.goal-values strong {
+  display: block;
+}
+
+.goal-values span {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.goal-values strong {
+  font-size: 15px;
+}
+
+.goal-progress {
+  height: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.goal-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green), #2fb171);
+  transition: width 0.3s ease;
+}
+
+.goal-percent {
+  display: block;
+  margin-top: 9px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.compact-table-wrapper {
+  max-height: 350px;
+}
+
+.passive-table {
+  min-width: 560px;
+  margin-top: 0;
+}
+
+.simulation-table {
+  min-width: 520px;
+}
+
+.passive-table th,
+.passive-table td {
+  padding: 11px 9px;
+}
+
+.asset-income-name {
+  display: grid;
+  gap: 2px;
+}
+
+.asset-income-name small {
+  font-size: 11px;
+}
+
+.currency-lines {
+  display: grid;
+  gap: 3px;
+}
+
+.currency-lines span {
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .passive-summary {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .passive-grid,
+  .lower-passive-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .passive-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-values {
+    grid-template-columns: 1fr;
+  }
+
+  .projection-chart {
+    height: 250px;
+  }
+}
