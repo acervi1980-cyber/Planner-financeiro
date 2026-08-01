@@ -68,6 +68,33 @@ const tabelaReinvestimento = document.getElementById("tabelaReinvestimento");
 const tabelaRendaAtivos = document.getElementById("tabelaRendaAtivos");
 const rendaVazia = document.getElementById("rendaVazia");
 
+const assetDrawer = document.getElementById("assetDrawer");
+const assetDrawerBackdrop = document.getElementById("assetDrawerBackdrop");
+const btnFecharDrawer = document.getElementById("btnFecharDrawer");
+const drawerLogo = document.getElementById("drawerLogo");
+const drawerCategoria = document.getElementById("drawerCategoria");
+const drawerTicker = document.getElementById("drawerTicker");
+const drawerMoeda = document.getElementById("drawerMoeda");
+const drawerResultado = document.getElementById("drawerResultado");
+const drawerRentabilidade = document.getElementById("drawerRentabilidade");
+const drawerQuantidade = document.getElementById("drawerQuantidade");
+const drawerPrecoMedio = document.getElementById("drawerPrecoMedio");
+const drawerCotacao = document.getElementById("drawerCotacao");
+const drawerInvestido = document.getElementById("drawerInvestido");
+const drawerMercado = document.getElementById("drawerMercado");
+const drawerDy = document.getElementById("drawerDy");
+const drawerYoc = document.getElementById("drawerYoc");
+const drawerYocMensal = document.getElementById("drawerYocMensal");
+const drawerRendaMensal = document.getElementById("drawerRendaMensal");
+const drawerRendaAnual = document.getElementById("drawerRendaAnual");
+const btnDrawerEditar = document.getElementById("btnDrawerEditar");
+const btnDrawerExcluir = document.getElementById("btnDrawerExcluir");
+const rendaHeroValor = document.getElementById("rendaHeroValor");
+const rendaHeroTexto = document.getElementById("rendaHeroTexto");
+const rendaHeroMeta = document.getElementById("rendaHeroMeta");
+const rendaHeroBarra = document.getElementById("rendaHeroBarra");
+
+
 
 const CORES_CATEGORIAS = [
   "#134e3a",
@@ -87,6 +114,7 @@ let dadosImportacaoPendentes = null;
 let ordenacao = { campo: "t", direcao: "asc" };
 let toastTimeout = null;
 let passiveSettings = carregarConfiguracoesRenda();
+let ativoNoDrawerId = null;
 
 function criarId() {
   if (window.crypto?.randomUUID) {
@@ -202,7 +230,7 @@ function obterAtivosVisiveis() {
 
   return ativos
     .filter((ativo) => {
-      const textoBusca = `${ativo.t} ${ativo.corretora}`.toLocaleUpperCase("pt-BR");
+      const textoBusca = ativo.t.toLocaleUpperCase("pt-BR");
       const correspondeBusca = !termo || textoBusca.includes(termo);
       const correspondeCategoria =
         categoriaSelecionada === "Todos" || ativo.c === categoriaSelecionada;
@@ -259,6 +287,137 @@ function calcularTotais() {
   return totais;
 }
 
+
+const LOGO_DOMAINS = {
+  AAPL: "apple.com",
+  COST: "costco.com",
+  MSFT: "microsoft.com",
+  AMZN: "amazon.com",
+  GOOGL: "google.com",
+  GOOG: "google.com",
+  META: "meta.com",
+  NVDA: "nvidia.com",
+  TSLA: "tesla.com",
+  KO: "coca-cola.com",
+  MCD: "mcdonalds.com",
+  DIS: "thewaltdisneycompany.com",
+  VOO: "vanguard.com",
+  VTI: "vanguard.com",
+  QQQ: "invesco.com",
+  SPY: "ssga.com",
+  PETR3: "petrobras.com.br",
+  PETR4: "petrobras.com.br",
+  ITUB3: "itau.com.br",
+  ITUB4: "itau.com.br",
+  BBAS3: "bb.com.br",
+  BBDC3: "bradesco.com.br",
+  BBDC4: "bradesco.com.br",
+  VALE3: "vale.com",
+  WEGE3: "weg.net",
+  ABEV3: "ambev.com.br",
+  IVVB11: "blackrock.com",
+  BOVA11: "blackrock.com",
+  VRTA11: "btgpactual.com",
+  BTLG11: "btgpactual.com",
+  KNRI11: "kinea.com.br",
+  KNSC11: "kinea.com.br",
+  VISC11: "vinci.com.br",
+  MXRF11: "xpasset.com.br",
+  HGLG11: "patria.com"
+};
+
+function siglaAtivo(tickerAtivo) {
+  return String(tickerAtivo || "AT")
+    .replace(/[^A-Z0-9]/gi, "")
+    .slice(0, 3)
+    .toUpperCase();
+}
+
+function obterUrlLogo(tickerAtivo) {
+  const dominio = LOGO_DOMAINS[String(tickerAtivo || "").toUpperCase()];
+  return dominio
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(dominio)}&sz=128`
+    : "";
+}
+
+function criarLogoHtml(ativo, classeExtra = "") {
+  const url = obterUrlLogo(ativo.t);
+  const sigla = siglaAtivo(ativo.t);
+
+  if (!url) {
+    return `<div class="asset-logo ${classeExtra}"><span class="asset-logo-fallback">${sigla}</span></div>`;
+  }
+
+  return `
+    <div class="asset-logo ${classeExtra}">
+      <span class="asset-logo-fallback">${sigla}</span>
+      <img
+        src="${url}"
+        alt=""
+        loading="lazy"
+        referrerpolicy="no-referrer"
+        onload="this.previousElementSibling.hidden=true"
+        onerror="this.remove()"
+      >
+    </div>
+  `;
+}
+
+function preencherLogoDrawer(ativo) {
+  drawerLogo.innerHTML = criarLogoHtml(ativo, "asset-logo-large")
+    .replace('<div class="asset-logo asset-logo-large">', "")
+    .replace(/<\/div>\s*$/, "");
+}
+
+function abrirDrawerAtivo(id) {
+  const ativo = ativos.find((item) => item.id === id);
+  if (!ativo) return;
+
+  ativoNoDrawerId = id;
+  const investido = ativo.q * ativo.p;
+  const mercado = ativo.q * ativo.cot;
+  const resultado = mercado - investido;
+  const rentabilidade = investido > 0 ? (resultado / investido) * 100 : 0;
+  const rendaAnual = mercado * (ativo.dy / 100);
+  const rendaMensal = rendaAnual / 12;
+  const yoc = investido > 0 ? (rendaAnual / investido) * 100 : 0;
+  const yocMensal = yoc / 12;
+
+  preencherLogoDrawer(ativo);
+  drawerCategoria.textContent = ativo.c;
+  drawerTicker.textContent = ativo.t;
+  drawerMoeda.textContent = descricaoMoeda(ativo.m);
+  drawerResultado.textContent = formatarMoeda(resultado, ativo.m);
+  drawerResultado.className = classeResultado(resultado);
+  drawerRentabilidade.textContent = formatarPercentual(rentabilidade);
+  drawerRentabilidade.className = classeResultado(rentabilidade);
+  drawerQuantidade.textContent = ativo.q.toLocaleString("pt-BR");
+  drawerPrecoMedio.textContent = formatarMoeda(ativo.p, ativo.m);
+  drawerCotacao.textContent = formatarMoeda(ativo.cot, ativo.m);
+  drawerInvestido.textContent = formatarMoeda(investido, ativo.m);
+  drawerMercado.textContent = formatarMoeda(mercado, ativo.m);
+  drawerDy.textContent = `${formatarPercentual(ativo.dy)} ao ano`;
+  drawerYoc.textContent = `${formatarPercentual(yoc)} ao ano`;
+  drawerYocMensal.textContent =
+    `Equivale a ${formatarPercentual(yocMensal)} ao mês sobre o valor investido.`;
+  drawerRendaMensal.textContent = formatarMoeda(rendaMensal, ativo.m);
+  drawerRendaAnual.textContent = formatarMoeda(rendaAnual, ativo.m);
+
+  assetDrawerBackdrop.hidden = false;
+  assetDrawer.classList.add("open");
+  assetDrawer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("drawer-open");
+  btnFecharDrawer.focus();
+}
+
+function fecharDrawerAtivo() {
+  ativoNoDrawerId = null;
+  assetDrawer.classList.remove("open");
+  assetDrawer.setAttribute("aria-hidden", "true");
+  assetDrawerBackdrop.hidden = true;
+  document.body.classList.remove("drawer-open");
+}
+
 function atualizar() {
   tabela.innerHTML = "";
 
@@ -272,6 +431,9 @@ function atualizar() {
     const rentabilidade = investido > 0 ? (resultado / investido) * 100 : 0;
 
     const linha = document.createElement("tr");
+    linha.dataset.id = ativo.id;
+    linha.tabIndex = 0;
+    linha.setAttribute("aria-label", `Abrir detalhes de ${ativo.t}`);
     linha.innerHTML = `
       <td class="favorite-column">
         <button
@@ -283,24 +445,26 @@ function atualizar() {
           title="${ativo.favorito ? "Remover dos favoritos" : "Adicionar aos favoritos"}"
         >★</button>
       </td>
-      <td><strong>${escaparHtml(ativo.t)}</strong></td>
+      <td>
+        <div class="asset-cell">
+          ${criarLogoHtml(ativo)}
+          <div class="asset-name">
+            <strong>${escaparHtml(ativo.t)}</strong>
+            <small>${escaparHtml(ativo.c)} · ${ativo.m === "USD" ? "Dólar" : "Real"}</small>
+          </div>
+        </div>
+      </td>
       <td>${escaparHtml(ativo.c)}</td>
-      <td>${descricaoMoeda(ativo.m)}</td>
       <td>${ativo.q.toLocaleString("pt-BR")}</td>
       <td>${formatarMoeda(ativo.p, ativo.m)}</td>
       <td>${formatarMoeda(ativo.cot, ativo.m)}</td>
-      <td>${formatarMoeda(investido, ativo.m)}</td>
       <td>${formatarMoeda(mercado, ativo.m)}</td>
       <td class="${classeResultado(resultado)}">${formatarMoeda(resultado, ativo.m)}</td>
       <td class="${classeResultado(rentabilidade)}">${formatarPercentual(rentabilidade)}</td>
-      <td>${formatarPercentual(ativo.dy)}</td>
-      <td class="muted-cell">${formatarData(ativo.data)}</td>
-      <td class="muted-cell">${ativo.corretora ? escaparHtml(ativo.corretora) : "—"}</td>
       <td>
-        <div class="action-buttons">
-          <button class="table-action" type="button" data-action="editar" data-id="${ativo.id}">Editar</button>
-          <button class="table-action delete" type="button" data-action="excluir" data-id="${ativo.id}">Excluir</button>
-        </div>
+        <button class="details-button" type="button" data-action="detalhes" data-id="${ativo.id}">
+          Detalhes
+        </button>
       </td>
     `;
     tabela.appendChild(linha);
@@ -742,6 +906,14 @@ function atualizarRendaPassiva() {
   metaMensalProgresso.textContent =
     meta > 0 ? `${formatarPercentual(progresso)} da meta mensal` : "Defina sua meta abaixo";
 
+  rendaHeroValor.textContent = `${formatarMoeda(mensalBRL, "BRL")} por mês`;
+  rendaHeroMeta.textContent = formatarPercentual(progresso);
+  rendaHeroBarra.style.width = `${progresso}%`;
+  rendaHeroTexto.textContent = ativos.some((ativo) => ativo.dy > 0)
+    ? `Projeção anual de ${formatarMoeda(anualBRL, "BRL")}, com base nos DYs cadastrados.`
+    : "Preencha o Dividend Yield dos ativos para visualizar sua projeção.";
+
+
   rendaMensalDetalhe.textContent =
     ativos.some((ativo) => ativo.dy > 0)
       ? "Estimativa pelos DYs cadastrados"
@@ -876,6 +1048,7 @@ function renderizarTabelaRendaAtivos() {
 }
 
 function abrirView(nomeView) {
+  fecharDrawerAtivo();
   const rendaAtiva = nomeView === "renda-passiva";
 
   viewDashboard.hidden = rendaAtiva;
@@ -954,16 +1127,49 @@ document.querySelectorAll(".sort-button").forEach((botao) => {
 tabela.addEventListener("click", (evento) => {
   const botao = evento.target.closest("button[data-action]");
 
-  if (!botao) return;
+  if (botao) {
+    evento.stopPropagation();
+    const { action, id } = botao.dataset;
 
-  const { action, id } = botao.dataset;
+    if (action === "favorito") {
+      alternarFavorito(id);
+    } else if (action === "detalhes") {
+      abrirDrawerAtivo(id);
+    }
+    return;
+  }
 
-  if (action === "editar") {
-    abrirModalEdicao(id);
-  } else if (action === "excluir") {
-    solicitarExclusao(id);
-  } else if (action === "favorito") {
-    alternarFavorito(id);
+  const linha = evento.target.closest("tr[data-id]");
+  if (linha) abrirDrawerAtivo(linha.dataset.id);
+});
+
+tabela.addEventListener("keydown", (evento) => {
+  if (evento.key !== "Enter" && evento.key !== " ") return;
+  const linha = evento.target.closest("tr[data-id]");
+  if (!linha) return;
+  evento.preventDefault();
+  abrirDrawerAtivo(linha.dataset.id);
+});
+
+
+btnFecharDrawer.addEventListener("click", fecharDrawerAtivo);
+assetDrawerBackdrop.addEventListener("click", fecharDrawerAtivo);
+
+btnDrawerEditar.addEventListener("click", () => {
+  const id = ativoNoDrawerId;
+  fecharDrawerAtivo();
+  if (id) abrirModalEdicao(id);
+});
+
+btnDrawerExcluir.addEventListener("click", () => {
+  const id = ativoNoDrawerId;
+  fecharDrawerAtivo();
+  if (id) solicitarExclusao(id);
+});
+
+document.addEventListener("keydown", (evento) => {
+  if (evento.key === "Escape" && assetDrawer.classList.contains("open")) {
+    fecharDrawerAtivo();
   }
 });
 
