@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#134e3a">
+  <title>Planner Financeiro</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="planner-logo" aria-label="Planner">
+        <span class="planner-mark" aria-hidden="true">
+          <span class="mark-bar bar-1"></span>
+          <span class="mark-bar bar-2"></span>
+          <span class="mark-bar bar-3"></span>
+          <span class="mark-curve"></span>
+        </span>
+        <span class="planner-word">Planner</span>
+      </div>
+
+      <nav class="menu" aria-label="Menu principal">
+        <a class="active" href="#">Dashboard</a>
+        <a href="#">Carteira</a>
+        <a href="#">FIIs</a>
+        <a href="#">Ações</a>
+        <a href="#">Stocks</a>
+        <a href="#">ETFs</a>
+        <a href="#">Dividendos</a>
+        <a href="#">Metas</a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <small>Planner Financeiro</small>
+        <span>Carteira local e privada</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="top">
+        <div>
+          <h1>Dashboard</h1>
+          <small>Visão consolidada da sua carteira</small>
+        </div>
+
+        <div class="top-actions">
+          <button type="button" class="secondary compact-button" id="btnTema" aria-pressed="false">
+            <span id="iconeTema" aria-hidden="true">☾</span>
+            <span id="textoTema">Modo escuro</span>
+          </button>
+          <button type="button" id="btnAdicionar">+ Adicionar Ativo</button>
+        </div>
+      </header>
+
+      <section class="cards" aria-label="Resumo da carteira">
+        <article class="card">
+          <small>Valor Investido</small>
+          <h2 id="valorInvestido">R$ 0,00</h2>
+          <span class="card-detail" id="detalheInvestido">0 ativos cadastrados</span>
+        </article>
+
+        <article class="card">
+          <small>Valor de Mercado</small>
+          <h2 id="valorMercado">R$ 0,00</h2>
+          <span class="card-detail">Patrimônio atual da carteira</span>
+        </article>
+
+        <article class="card">
+          <small>Lucro / Prejuízo</small>
+          <h2 id="lucroPrejuizo" class="neutral">R$ 0,00</h2>
+          <span class="card-detail neutral" id="rentabilidadeCarteira">0,00%</span>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="panel allocation-panel">
+          <div class="panel-header">
+            <div>
+              <h3>Alocação por categoria</h3>
+              <small>Distribuição pelo valor de mercado em cada moeda</small>
+            </div>
+          </div>
+
+          <div class="allocation-content" id="alocacaoConteudo">
+            <div class="chart-empty">
+              <strong>Adicione ativos para visualizar a alocação.</strong>
+              <span>O gráfico será atualizado automaticamente.</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel indicators-panel">
+          <div class="panel-header">
+            <div>
+              <h3>Indicadores</h3>
+              <small>Resumo complementar da carteira</small>
+            </div>
+          </div>
+
+          <div class="indicator-list">
+            <div class="indicator-row">
+              <span>Ativos cadastrados</span>
+              <strong id="indicadorQuantidade">0</strong>
+            </div>
+            <div class="indicator-row">
+              <span>Favoritos</span>
+              <strong id="indicadorFavoritos">0</strong>
+            </div>
+            <div class="indicator-row">
+              <span>DY médio — Real</span>
+              <strong id="indicadorDyBRL">0,00%</strong>
+            </div>
+            <div class="indicator-row">
+              <span>DY médio — Dólar</span>
+              <strong id="indicadorDyUSD">0,00%</strong>
+            </div>
+            <div class="indicator-row">
+              <span>Rendimentos estimados/ano</span>
+              <strong id="indicadorRendimentos">R$ 0,00</strong>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel portfolio-panel">
+        <div class="panel-header portfolio-header">
+          <div>
+            <h3>Carteira</h3>
+            <small id="contadorAtivos">0 ativos</small>
+          </div>
+
+          <div class="data-actions">
+            <button type="button" class="secondary compact-button" id="btnExportar">Exportar backup</button>
+            <button type="button" class="secondary compact-button" id="btnImportar">Importar backup</button>
+            <input type="file" id="arquivoImportacao" accept=".json,application/json" hidden>
+          </div>
+        </div>
+
+        <div class="portfolio-tools">
+          <div class="search-field">
+            <label class="sr-only" for="buscaAtivo">Buscar ativo</label>
+            <input id="buscaAtivo" type="search" placeholder="Buscar por ticker ou corretora..." autocomplete="off">
+          </div>
+
+          <div class="filter-field">
+            <label class="sr-only" for="filtroCategoria">Filtrar por categoria</label>
+            <select id="filtroCategoria">
+              <option value="Todos">Todos os tipos</option>
+              <option value="FII">FIIs</option>
+              <option value="Ação">Ações</option>
+              <option value="Stock">Stocks</option>
+              <option value="ETF Brasil">ETF Brasil</option>
+              <option value="ETF Internacional">ETF Internacional</option>
+              <option value="BDR">BDRs</option>
+              <option value="Renda Fixa">Renda Fixa</option>
+            </select>
+          </div>
+
+          <label class="favorite-filter">
+            <input type="checkbox" id="somenteFavoritos">
+            <span>Somente favoritos</span>
+          </label>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th class="favorite-column"><span class="sr-only">Favorito</span>★</th>
+                <th><button class="sort-button" type="button" data-sort="t">Ticker <span aria-hidden="true">↕</span></button></th>
+                <th><button class="sort-button" type="button" data-sort="c">Categoria <span aria-hidden="true">↕</span></button></th>
+                <th>Moeda</th>
+                <th><button class="sort-button" type="button" data-sort="q">Qtd <span aria-hidden="true">↕</span></button></th>
+                <th><button class="sort-button" type="button" data-sort="p">P. Médio <span aria-hidden="true">↕</span></button></th>
+                <th><button class="sort-button" type="button" data-sort="cot">Cotação <span aria-hidden="true">↕</span></button></th>
+                <th>Valor Investido</th>
+                <th>Valor de Mercado</th>
+                <th>Lucro / Prejuízo</th>
+                <th>Rentab.</th>
+                <th><button class="sort-button" type="button" data-sort="dy">DY <span aria-hidden="true">↕</span></button></th>
+                <th>Compra</th>
+                <th>Corretora</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tb"></tbody>
+          </table>
+        </div>
+
+        <div class="empty-state" id="estadoVazio" hidden>
+          <strong>Nenhum ativo encontrado.</strong>
+          <span>Altere a busca, os filtros ou adicione um novo ativo.</span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="modal">
+    <form id="formAtivo">
+      <div class="dialog-heading">
+        <div>
+          <h3 id="tituloModal">Adicionar ativo</h3>
+          <small id="subtituloModal">Cadastre um novo investimento.</small>
+        </div>
+        <button type="button" class="icon-button close-button" id="btnFecharModal" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="field-group">
+          <label for="cat">Tipo</label>
+          <select id="cat" required>
+            <option value="FII">FII</option>
+            <option value="Ação">Ação</option>
+            <option value="Stock">Stock</option>
+            <option value="ETF Brasil">ETF Brasil</option>
+            <option value="ETF Internacional">ETF Internacional</option>
+            <option value="BDR">BDR</option>
+            <option value="Renda Fixa">Renda Fixa</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="moeda">Moeda</label>
+          <select id="moeda" required>
+            <option value="BRL">🇧🇷 Real (R$)</option>
+            <option value="USD">🇺🇸 Dólar (US$)</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="tic">Ticker</label>
+          <input id="tic" placeholder="Ex.: KNRI11" autocomplete="off" required>
+        </div>
+
+        <div class="field-group">
+          <label for="qtd">Quantidade</label>
+          <input id="qtd" type="number" min="0" step="any" placeholder="0" required>
+        </div>
+
+        <div class="field-group">
+          <label for="pm">Preço médio</label>
+          <input id="pm" type="number" min="0" step="0.01" placeholder="0,00" required>
+        </div>
+
+        <div class="field-group">
+          <label for="cot">Cotação atual</label>
+          <input id="cot" type="number" min="0" step="0.01" placeholder="0,00" required>
+        </div>
+
+        <div class="field-group">
+          <label for="dy">Dividend Yield anual (%)</label>
+          <input id="dy" type="number" min="0" step="0.01" placeholder="0,00">
+        </div>
+
+        <div class="field-group">
+          <label for="dataCompra">Data da compra</label>
+          <input id="dataCompra" type="date">
+        </div>
+
+        <div class="field-group form-grid-full">
+          <label for="corretora">Corretora</label>
+          <input id="corretora" placeholder="Ex.: Caixa, XP, Avenue..." autocomplete="organization">
+        </div>
+
+        <label class="favorite-field form-grid-full">
+          <input type="checkbox" id="favorito">
+          <span>Marcar este ativo como favorito</span>
+        </label>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="submit" id="btnSalvar">Salvar</button>
+        <button type="button" class="secondary" id="btnCancelar">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="modalExcluir" class="confirm-dialog">
+    <div class="confirm-content">
+      <div class="confirm-icon" aria-hidden="true">!</div>
+      <div>
+        <h3>Excluir ativo?</h3>
+        <p id="textoConfirmacao">Esta ação não poderá ser desfeita.</p>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="danger" id="btnConfirmarExclusao">Excluir</button>
+      <button type="button" class="secondary" id="btnCancelarExclusao">Cancelar</button>
+    </div>
+  </dialog>
+
+  <dialog id="modalImportacao" class="confirm-dialog">
+    <div class="confirm-content">
+      <div class="confirm-icon import-icon" aria-hidden="true">↥</div>
+      <div>
+        <h3>Importar backup?</h3>
+        <p id="textoImportacao">Os ativos atuais serão substituídos pelos dados do arquivo selecionado.</p>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="btnConfirmarImportacao">Importar</button>
+      <button type="button" class="secondary" id="btnCancelarImportacao">Cancelar</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
