@@ -2,7 +2,6 @@ const STORAGE_KEY = "planner";
 const THEME_KEY = "planner-theme";
 const BACKUP_VERSION = 3;
 const PASSIVE_SETTINGS_KEY = "planner-passive-settings";
-const API_SETTINGS_KEY = "planner-api-settings";
 
 const modal = document.getElementById("modal");
 const modalExcluir = document.getElementById("modalExcluir");
@@ -36,15 +35,6 @@ const quotesStatusTitle = document.getElementById("quotesStatusTitle");
 const quotesStatusText = document.getElementById("quotesStatusText");
 const quotesStatusTime = document.getElementById("quotesStatusTime");
 const QUOTES_STATUS_KEY = "planner-quotes-status";
-const modalConfiguracoes = document.getElementById("modalConfiguracoes");
-const formConfiguracoes = document.getElementById("formConfiguracoes");
-const btnConfiguracoes = document.getElementById("btnConfiguracoes");
-const btnFecharConfiguracoes = document.getElementById("btnFecharConfiguracoes");
-const btnLimparConfiguracoes = document.getElementById("btnLimparConfiguracoes");
-const brapiToken = document.getElementById("brapiToken");
-const finnhubToken = document.getElementById("finnhubToken");
-const statusBrapi = document.getElementById("statusBrapi");
-const statusFinnhub = document.getElementById("statusFinnhub");
 
 const valorInvestidoEl = document.getElementById("valorInvestido");
 const valorMercadoEl = document.getElementById("valorMercado");
@@ -308,7 +298,6 @@ function calcularTotais() {
 const LOGO_DOMAINS = {
   AAPL: "apple.com",
   COST: "costco.com",
-  FTNT: "fortinet.com",
   MSFT: "microsoft.com",
   AMZN: "amazon.com",
   GOOGL: "google.com",
@@ -442,6 +431,9 @@ function obterFontesLogo(ativo) {
 
   const fontes = [];
   const ehAtivoB3 = ativo?.m === "BRL" && ativo?.c !== "Renda Fixa";
+  const ehAtivoAmericano =
+    ativo?.m === "USD" &&
+    (ativo?.c === "Stock" || ativo?.c === "ETF Internacional");
 
   // A brapi disponibiliza os logotipos da B3 diretamente pelo ticker.
   // Assim, novas ações e BDRs não precisam ser incluídos manualmente no código.
@@ -449,6 +441,11 @@ function obterFontesLogo(ativo) {
     fontes.push(`https://icons.brapi.dev/icons/${encodeURIComponent(chave)}.svg`);
   }
 
+  // Fonte automática por ticker para ações e ETFs dos Estados Unidos.
+  // Caso a imagem não exista, o carregamento segue para as fontes por domínio.
+  if (ehAtivoAmericano) {
+    fontes.push(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(chave)}.png`);
+  }
 
   const dominio = LOGO_DOMAINS[chave];
   if (dominio) {
@@ -535,7 +532,9 @@ function criarLogoHtml(ativo, classeExtra = "") {
 
   if (fontes.length) {
     const fontesSerializadas = escaparHtml(JSON.stringify(fontes));
-    const fallback = `<span class="asset-logo-icon" aria-hidden="true">${criarIconeSvg(tipoLogo)}</span>`;
+    const fallback = tipoLogo === "empresa"
+      ? `<span class="asset-logo-fallback">${sigla}</span>`
+      : `<span class="asset-logo-icon" aria-hidden="true">${criarIconeSvg(tipoLogo)}</span>`;
 
     return `
       <div class="${classes}" data-logo-ticker="${escaparHtml(ativo.t)}">
@@ -555,6 +554,10 @@ function criarLogoHtml(ativo, classeExtra = "") {
     `;
   }
 
+  if (tipoLogo === "empresa") {
+    return `<div class="${classes}"><span class="asset-logo-fallback">${sigla}</span></div>`;
+  }
+
   return `
     <div class="${classes}">
       <span class="asset-logo-icon" aria-hidden="true">${criarIconeSvg(tipoLogo)}</span>
@@ -563,10 +566,12 @@ function criarLogoHtml(ativo, classeExtra = "") {
 }
 
 function preencherLogoDrawer(ativo) {
-  const html = criarLogoHtml(ativo, "asset-logo-large");
-  drawerLogo.innerHTML = html
-    .replace(/^<div class="asset-logo(?: [^"]+)?">/, "")
-    .replace(/<\/div>\s*$/, "");
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = criarLogoHtml(ativo, "asset-logo-large").trim();
+  const logoGerado = wrapper.firstElementChild;
+
+  drawerLogo.className = logoGerado?.className || "asset-logo asset-logo-large";
+  drawerLogo.innerHTML = logoGerado?.innerHTML || `<span class="asset-logo-fallback">${siglaAtivo(ativo.t)}</span>`;
 }
 
 function abrirDrawerAtivo(id) {
@@ -1272,57 +1277,6 @@ function abrirView(nomeView) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function carregarConfiguracoesApi() {
-  try {
-    const dados = JSON.parse(localStorage.getItem(API_SETTINGS_KEY) || "{}");
-    return {
-      brapi: String(dados.brapi || ""),
-      finnhub: String(dados.finnhub || "")
-    };
-  } catch {
-    return { brapi: "", finnhub: "" };
-  }
-}
-
-function atualizarStatusConfiguracoesApi() {
-  const configuracoes = carregarConfiguracoesApi();
-  const atualizarStatus = (elemento, configurado) => {
-    elemento.textContent = configurado ? "Configurada" : "Não configurada";
-    elemento.classList.toggle("is-configured", configurado);
-  };
-
-  atualizarStatus(statusBrapi, Boolean(configuracoes.brapi));
-  atualizarStatus(statusFinnhub, Boolean(configuracoes.finnhub));
-}
-
-function abrirConfiguracoes() {
-  const configuracoes = carregarConfiguracoesApi();
-  brapiToken.value = configuracoes.brapi;
-  finnhubToken.value = configuracoes.finnhub;
-  atualizarStatusConfiguracoesApi();
-  modalConfiguracoes.showModal();
-}
-
-function salvarConfiguracoesApi(evento) {
-  evento.preventDefault();
-  const configuracoes = {
-    brapi: brapiToken.value.trim(),
-    finnhub: finnhubToken.value.trim()
-  };
-  localStorage.setItem(API_SETTINGS_KEY, JSON.stringify(configuracoes));
-  atualizarStatusConfiguracoesApi();
-  modalConfiguracoes.close();
-  mostrarToast("Configurações de API salvas neste navegador.");
-}
-
-function limparConfiguracoesApi() {
-  localStorage.removeItem(API_SETTINGS_KEY);
-  brapiToken.value = "";
-  finnhubToken.value = "";
-  atualizarStatusConfiguracoesApi();
-  mostrarToast("Chaves de API removidas deste navegador.");
-}
-
 function formatarDataHoraCotacoes(dataIso) {
   if (!dataIso) return "Nunca verificado";
 
@@ -1421,27 +1375,15 @@ menuScrollLinks.forEach((link) => {
 });
 
 document.querySelectorAll('.menu a[aria-disabled="true"]').forEach((link) => {
-  link.addEventListener("click", (evento) => evento.preventDefault());
+  link.addEventListener("click", (evento) => {
+    evento.preventDefault();
+    mostrarToast("Este módulo será liberado em uma próxima atualização.");
+  });
 });
 
 metaRendaMensal.addEventListener("change", salvarConfiguracoesRenda);
 aporteMensal.addEventListener("change", salvarConfiguracoesRenda);
 periodoProjecao.addEventListener("change", atualizarRendaPassiva);
-
-btnConfiguracoes.addEventListener("click", abrirConfiguracoes);
-btnFecharConfiguracoes.addEventListener("click", () => modalConfiguracoes.close());
-btnLimparConfiguracoes.addEventListener("click", limparConfiguracoesApi);
-formConfiguracoes.addEventListener("submit", salvarConfiguracoesApi);
-
-document.querySelectorAll(".token-visibility").forEach((botao) => {
-  botao.addEventListener("click", () => {
-    const campo = document.getElementById(botao.dataset.target);
-    if (!campo) return;
-    const mostrar = campo.type === "password";
-    campo.type = mostrar ? "text" : "password";
-    botao.textContent = mostrar ? "Ocultar" : "Mostrar";
-  });
-});
 
 btnTema.addEventListener("click", () => {
   const temaAtual = document.documentElement.dataset.theme;
@@ -1573,7 +1515,6 @@ modalImportacao.addEventListener("close", () => {
 });
 
 inicializarTema();
-atualizarStatusConfiguracoesApi();
 carregarStatusCotacoes();
 atualizar();
 abrirView(location.hash === "#renda-passiva" ? "renda-passiva" : "dashboard");
