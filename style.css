@@ -1579,3 +1579,114 @@ body.drawer-open {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ===== Planner v1.5 — Central de cotações ===== */
+.quote-update-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: var(--gold);
+  color: #1f2b27;
+  font-weight: 700;
+}
+
+.quote-update-button.is-loading {
+  cursor: wait;
+  opacity: 0.78;
+}
+
+.quotes-status-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 2px;
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--green) 18%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--green-soft) 72%, var(--card));
+}
+
+.quotes-status-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--green);
+  font-size: 19px;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.quotes-status-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quotes-status-copy strong {
+  font-size: 13px;
+}
+
+.quotes-status-copy span,
+.quotes-status-time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.quotes-status-time {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.quotes-status-panel.is-loading .quotes-status-icon {
+  animation: quoteSpin 0.9s linear infinite;
+}
+
+.quotes-status-panel.is-success {
+  border-color: color-mix(in srgb, var(--profit) 36%, var(--line));
+}
+
+.quotes-status-panel.is-success .quotes-status-icon {
+  color: var(--profit);
+}
+
+@keyframes quoteSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 760px) {
+  .quotes-status-panel {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .quotes-status-time {
+    grid-column: 2;
+    text-align: left;
+  }
+}
+
+
+/* ===== Planner v1.6 — Logotipos automáticos por ticker ===== */
+.asset-logo.has-image {
+  background: #ffffff;
+}
+
+html[data-theme="dark"] .asset-logo.has-image {
+  background: #f8fafc;
+}
+
+.asset-logo.has-image img {
+  width: 78%;
+  height: 78%;
+  filter: saturate(1.03);
+}
+
+.asset-logo-large.has-image img {
+  width: 80%;
+  height: 80%;
+}

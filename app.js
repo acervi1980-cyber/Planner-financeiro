@@ -28,6 +28,13 @@ const subtituloModal = document.getElementById("subtituloModal");
 const textoConfirmacao = document.getElementById("textoConfirmacao");
 const arquivoImportacao = document.getElementById("arquivoImportacao");
 const toast = document.getElementById("toast");
+const btnAtualizarCotacoes = document.getElementById("btnAtualizarCotacoes");
+const quotesStatusPanel = document.getElementById("quotesStatusPanel");
+const quotesStatusIcon = document.getElementById("quotesStatusIcon");
+const quotesStatusTitle = document.getElementById("quotesStatusTitle");
+const quotesStatusText = document.getElementById("quotesStatusText");
+const quotesStatusTime = document.getElementById("quotesStatusTime");
+const QUOTES_STATUS_KEY = "planner-quotes-status";
 
 const valorInvestidoEl = document.getElementById("valorInvestido");
 const valorMercadoEl = document.getElementById("valorMercado");
@@ -331,16 +338,16 @@ const LOGO_DOMAINS = {
   ELET3: "eletrobras.com",
   ELET6: "eletrobras.com",
   SUZB3: "suzano.com.br",
-  RADL3: "radial.com.br",
+  RADL3: "rdsaude.com.br",
   B3SA3: "b3.com.br",
-  CGAS5: "copel.com",
+  CGAS5: "comgas.com.br",
   UGPA3: "ultrapar.com.br",
   HYPE3: "hypera.com.br",
   ASAI3: "assai.com.br",
   ENBR3: "enel.com.br",
   GGBR4: "gerdau.com.br",
   CRFB3: "carrefour.com.br",
-  SMBU3: "santander.com.br",
+  SMBU3: "smartfit.com.br",
   ENEV3: "eneva.com.br",
   IRBR3: "irbbrasilseguradora.com.br",
   CVCB3: "cvc.com.br",
@@ -348,8 +355,8 @@ const LOGO_DOMAINS = {
   LREN3: "lrenner.com.br",
   FLRY3: "fleury.com.br",
   MGLU3: "magazineluiza.com.br",
-  SOMA3: "somai.com.br",
-  PCAR3: "pocari.com.br",
+  SOMA3: "somagrupo.com.br",
+  PCAR3: "gpabr.com",
   CMIG4: "cemig.com.br",
   PSSA3: "portoseguro.com.br",
   KLBN11: "klabin.com.br",
@@ -371,7 +378,7 @@ const LOGO_DOMAINS = {
   NFLX: "netflix.com",
   PYPL: "paypal.com",
   ABBV: "abbvie.com",
-  AVGO: "avgo.com",
+  AVGO: "broadcom.com",
   QCOM: "qualcomm.com",
   TXN: "ti.com",
   AMGN: "amgen.com",
@@ -380,7 +387,7 @@ const LOGO_DOMAINS = {
   INTU: "intuit.com",
   CMCSA: "comcast.com",
   PEP: "pepsico.com",
-  COKE: "coca-colacompany.com",
+  COKE: "coca-cola.com",
   WM: "wastemanagement.com",
   GE: "ge.com",
   UNH: "uhc.com",
@@ -418,21 +425,67 @@ function tipoLogoAtivo(ativo) {
   return "empresa";
 }
 
-function obterUrlLogo(tickerAtivo) {
-  const chave = normalizarTickerParaChave(tickerAtivo);
-  const dominio = LOGO_DOMAINS[chave];
+function obterFontesLogo(ativo) {
+  const chave = normalizarTickerParaChave(ativo?.t);
+  if (!chave) return [];
 
-  if (!dominio) {
-    return "";
+  const fontes = [];
+  const ehAtivoB3 = ativo?.m === "BRL" && ativo?.c !== "Renda Fixa";
+  const ehAtivoAmericano =
+    ativo?.m === "USD" &&
+    (ativo?.c === "Stock" || ativo?.c === "ETF Internacional");
+
+  // A brapi disponibiliza os logotipos da B3 diretamente pelo ticker.
+  // Assim, novas ações e BDRs não precisam ser incluídos manualmente no código.
+  if (ehAtivoB3) {
+    fontes.push(`https://icons.brapi.dev/icons/${encodeURIComponent(chave)}.svg`);
   }
 
-  const host = String(dominio)
-    .trim()
-    .replace(/^https?:\/\//i, "")
-    .replace(/\/.*$/, "")
-    .toLowerCase();
+  // Fonte automática por ticker para ações e ETFs dos Estados Unidos.
+  // Caso a imagem não exista, o carregamento segue para as fontes por domínio.
+  if (ehAtivoAmericano) {
+    fontes.push(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(chave)}.png`);
+  }
 
-  return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`;
+  const dominio = LOGO_DOMAINS[chave];
+  if (dominio) {
+    const host = String(dominio)
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/.*$/, "")
+      .toLowerCase();
+
+    fontes.push(
+      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
+      `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`
+    );
+  }
+
+  return [...new Set(fontes)];
+}
+
+function tentarProximaFonteLogo(imagem) {
+  if (!(imagem instanceof HTMLImageElement)) return;
+
+  let fontes = [];
+  try {
+    fontes = JSON.parse(imagem.dataset.fontesLogo || "[]");
+  } catch {
+    fontes = [];
+  }
+
+  const indiceAtual = Number(imagem.dataset.indiceLogo || 0);
+  const proximoIndice = indiceAtual + 1;
+
+  if (proximoIndice < fontes.length) {
+    imagem.dataset.indiceLogo = String(proximoIndice);
+    imagem.src = fontes[proximoIndice];
+    return;
+  }
+
+  const container = imagem.closest(".asset-logo");
+  container?.classList.remove("has-image");
+  imagem.remove();
 }
 
 function criarIconeSvg(tipo) {
@@ -472,22 +525,30 @@ function criarIconeSvg(tipo) {
 }
 
 function criarLogoHtml(ativo, classeExtra = "") {
-  const url = obterUrlLogo(ativo.t);
+  const fontes = obterFontesLogo(ativo);
   const sigla = siglaAtivo(ativo.t);
   const tipoLogo = tipoLogoAtivo(ativo);
   const classes = ["asset-logo", classeExtra, `asset-logo-${tipoLogo}`].filter(Boolean).join(" ");
 
-  if (tipoLogo === "empresa" && url) {
+  if (fontes.length) {
+    const fontesSerializadas = escaparHtml(JSON.stringify(fontes));
+    const fallback = tipoLogo === "empresa"
+      ? `<span class="asset-logo-fallback">${sigla}</span>`
+      : `<span class="asset-logo-icon" aria-hidden="true">${criarIconeSvg(tipoLogo)}</span>`;
+
     return `
-      <div class="${classes}">
-        <span class="asset-logo-fallback">${sigla}</span>
+      <div class="${classes}" data-logo-ticker="${escaparHtml(ativo.t)}">
+        ${fallback}
         <img
-          src="${url}"
+          src="${fontes[0]}"
           alt=""
           loading="lazy"
+          decoding="async"
           referrerpolicy="no-referrer"
-          onload="this.previousElementSibling.hidden=true"
-          onerror="this.remove()"
+          data-fontes-logo="${fontesSerializadas}"
+          data-indice-logo="0"
+          onload="this.previousElementSibling.hidden=true; this.closest('.asset-logo')?.classList.add('has-image')"
+          onerror="tentarProximaFonteLogo(this)"
         >
       </div>
     `;
@@ -1214,12 +1275,80 @@ function abrirView(nomeView) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function formatarDataHoraCotacoes(dataIso) {
+  if (!dataIso) return "Nunca verificado";
+
+  const data = new Date(dataIso);
+  if (Number.isNaN(data.getTime())) return "Nunca verificado";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(data);
+}
+
+function carregarStatusCotacoes() {
+  let ultimaVerificacao = "";
+
+  try {
+    ultimaVerificacao = localStorage.getItem(QUOTES_STATUS_KEY) || "";
+  } catch (erro) {
+    console.warn("Não foi possível ler o status das cotações.", erro);
+  }
+
+  quotesStatusTime.textContent = formatarDataHoraCotacoes(ultimaVerificacao);
+
+  if (ultimaVerificacao) {
+    quotesStatusPanel.classList.add("is-success");
+    quotesStatusIcon.textContent = "✓";
+    quotesStatusTitle.textContent = "Carteira conferida";
+    quotesStatusText.textContent = "Estrutura validada. As cotações cadastradas foram mantidas sem alteração.";
+  }
+}
+
+function atualizarCotacoes() {
+  if (!btnAtualizarCotacoes || btnAtualizarCotacoes.disabled) return;
+
+  btnAtualizarCotacoes.disabled = true;
+  btnAtualizarCotacoes.classList.add("is-loading");
+  btnAtualizarCotacoes.textContent = "Verificando...";
+  quotesStatusPanel.classList.remove("is-success");
+  quotesStatusPanel.classList.add("is-loading");
+  quotesStatusIcon.textContent = "↻";
+  quotesStatusTitle.textContent = "Verificando a estrutura de cotações";
+  quotesStatusText.textContent = "Conferindo tickers, moedas e preços cadastrados na carteira...";
+  quotesStatusTime.textContent = "Em andamento";
+
+  window.setTimeout(() => {
+    const ativosValidos = ativos.filter((ativo) => ativo.t && ativo.m && Number.isFinite(Number(ativo.cot)));
+    const agora = new Date().toISOString();
+
+    try {
+      localStorage.setItem(QUOTES_STATUS_KEY, agora);
+    } catch (erro) {
+      console.warn("Não foi possível salvar o status das cotações.", erro);
+    }
+
+    quotesStatusPanel.classList.remove("is-loading");
+    quotesStatusPanel.classList.add("is-success");
+    quotesStatusIcon.textContent = "✓";
+    quotesStatusTitle.textContent = `${ativosValidos.length} ${ativosValidos.length === 1 ? "ativo conferido" : "ativos conferidos"}`;
+    quotesStatusText.textContent = "Módulo v1.5 ativo. Nenhum preço foi alterado; a conexão com a API será feita na próxima etapa.";
+    quotesStatusTime.textContent = formatarDataHoraCotacoes(agora);
+    btnAtualizarCotacoes.disabled = false;
+    btnAtualizarCotacoes.classList.remove("is-loading");
+    btnAtualizarCotacoes.textContent = "↻ Atualizar cotações";
+    mostrarToast("Central de cotações verificada com sucesso.");
+  }, 900);
+}
+
 document.getElementById("btnAdicionar").addEventListener("click", abrirModalNovoAtivo);
 document.getElementById("btnCancelar").addEventListener("click", fecharModalCadastro);
 document.getElementById("btnFecharModal").addEventListener("click", fecharModalCadastro);
 document.getElementById("btnCancelarExclusao").addEventListener("click", fecharModalExclusao);
 document.getElementById("btnExportar").addEventListener("click", exportarBackup);
 document.getElementById("btnImportar").addEventListener("click", () => arquivoImportacao.click());
+btnAtualizarCotacoes.addEventListener("click", atualizarCotacoes);
 document.getElementById("btnConfirmarImportacao").addEventListener("click", confirmarImportacao);
 document.getElementById("btnCancelarImportacao").addEventListener("click", cancelarImportacao);
 
@@ -1381,5 +1510,6 @@ modalImportacao.addEventListener("close", () => {
 });
 
 inicializarTema();
+carregarStatusCotacoes();
 atualizar();
 abrirView(location.hash === "#renda-passiva" ? "renda-passiva" : "dashboard");

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro</title>
+  <title>Planner Financeiro · v1.6</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,27 +21,26 @@
       </div>
 
       <nav class="menu" aria-label="Menu principal">
-        <a class="active" href="#">Dashboard</a>
-        <a href="#">Carteira</a>
-        <a href="#">FIIs</a>
-        <a href="#">Ações</a>
-        <a href="#">Stocks</a>
-        <a href="#">ETFs</a>
-        <a href="#">Dividendos</a>
-        <a href="#">Metas</a>
+        <a class="active" href="#dashboard" data-view="dashboard">Dashboard</a>
+        <a href="#carteira" data-scroll="carteira">Carteira</a>
+        <a href="#renda-passiva" data-view="renda-passiva">Renda Passiva</a>
+        <a href="#" aria-disabled="true">Dividendos</a>
+        <a href="#" aria-disabled="true">Movimentações</a>
+        <a href="#" aria-disabled="true">Metas</a>
+        <a href="#" aria-disabled="true">Análises</a>
       </nav>
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Carteira local e privada</span>
+        <span>Versão 1.6 · Logotipos automáticos</span>
       </div>
     </aside>
 
     <main class="main">
       <header class="top">
         <div>
-          <h1>Dashboard</h1>
-          <small>Visão consolidada da sua carteira</small>
+          <h1 id="tituloPagina">Dashboard</h1>
+          <small id="subtituloPagina">Visão consolidada da sua carteira</small>
         </div>
 
         <div class="top-actions">
@@ -53,6 +52,7 @@
         </div>
       </header>
 
+      <div class="app-view active" id="viewDashboard">
       <section class="cards" aria-label="Resumo da carteira">
         <article class="card">
           <small>Valor Investido</small>
@@ -123,7 +123,7 @@
         </article>
       </section>
 
-      <section class="panel portfolio-panel">
+      <section class="panel portfolio-panel" id="carteira">
         <div class="panel-header portfolio-header">
           <div>
             <h3>Carteira</h3>
@@ -131,16 +131,26 @@
           </div>
 
           <div class="data-actions">
+            <button type="button" class="quote-update-button compact-button" id="btnAtualizarCotacoes">↻ Atualizar cotações</button>
             <button type="button" class="secondary compact-button" id="btnExportar">Exportar backup</button>
             <button type="button" class="secondary compact-button" id="btnImportar">Importar backup</button>
             <input type="file" id="arquivoImportacao" accept=".json,application/json" hidden>
           </div>
         </div>
 
+        <div class="quotes-status-panel" id="quotesStatusPanel" aria-live="polite">
+          <div class="quotes-status-icon" id="quotesStatusIcon" aria-hidden="true">◷</div>
+          <div class="quotes-status-copy">
+            <strong id="quotesStatusTitle">Cotações prontas para conferência</strong>
+            <span id="quotesStatusText">Os preços cadastrados permanecem preservados até a conexão com uma API de mercado.</span>
+          </div>
+          <span class="quotes-status-time" id="quotesStatusTime">Nunca verificado</span>
+        </div>
+
         <div class="portfolio-tools">
           <div class="search-field">
             <label class="sr-only" for="buscaAtivo">Buscar ativo</label>
-            <input id="buscaAtivo" type="search" placeholder="Buscar por ticker ou corretora..." autocomplete="off">
+            <input id="buscaAtivo" type="search" placeholder="Buscar por ticker..." autocomplete="off">
           </div>
 
           <div class="filter-field">
@@ -164,23 +174,18 @@
         </div>
 
         <div class="table-wrapper">
-          <table>
+          <table class="portfolio-table">
             <thead>
               <tr>
                 <th class="favorite-column"><span class="sr-only">Favorito</span>★</th>
-                <th><button class="sort-button" type="button" data-sort="t">Ticker <span aria-hidden="true">↕</span></button></th>
-                <th><button class="sort-button" type="button" data-sort="c">Categoria <span aria-hidden="true">↕</span></button></th>
-                <th>Moeda</th>
-                <th><button class="sort-button" type="button" data-sort="q">Qtd <span aria-hidden="true">↕</span></button></th>
-                <th><button class="sort-button" type="button" data-sort="p">P. Médio <span aria-hidden="true">↕</span></button></th>
+                <th><button class="sort-button" type="button" data-sort="t">Ativo <span aria-hidden="true">↕</span></button></th>
+                <th><button class="sort-button" type="button" data-sort="c">Tipo <span aria-hidden="true">↕</span></button></th>
+                <th><button class="sort-button" type="button" data-sort="q">Quantidade <span aria-hidden="true">↕</span></button></th>
+                <th><button class="sort-button" type="button" data-sort="p">Preço médio <span aria-hidden="true">↕</span></button></th>
                 <th><button class="sort-button" type="button" data-sort="cot">Cotação <span aria-hidden="true">↕</span></button></th>
-                <th>Valor Investido</th>
-                <th>Valor de Mercado</th>
-                <th>Lucro / Prejuízo</th>
-                <th>Rentab.</th>
-                <th><button class="sort-button" type="button" data-sort="dy">DY <span aria-hidden="true">↕</span></button></th>
-                <th>Compra</th>
-                <th>Corretora</th>
+                <th>Valor de mercado</th>
+                <th>Resultado</th>
+                <th>Resultado (%)</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -192,6 +197,160 @@
           <strong>Nenhum ativo encontrado.</strong>
           <span>Altere a busca, os filtros ou adicione um novo ativo.</span>
         </div>
+      </section>
+      </div>
+
+      <section class="app-view" id="viewRendaPassiva" hidden>
+        <section class="passive-hero" aria-label="Renda passiva estimada">
+          <div class="passive-hero-copy">
+            <span class="eyebrow">Sua renda passiva estimada</span>
+            <strong id="rendaHeroValor">R$ 0,00 por mês</strong>
+            <p id="rendaHeroTexto">Preencha o Dividend Yield dos ativos para visualizar sua projeção.</p>
+          </div>
+          <div class="passive-hero-progress">
+            <div>
+              <span>Progresso da meta</span>
+              <strong id="rendaHeroMeta">0,00%</strong>
+            </div>
+            <div class="hero-progress-track"><span id="rendaHeroBarra"></span></div>
+          </div>
+        </section>
+
+        <section class="passive-summary" aria-label="Resumo da renda passiva">
+          <article class="card passive-card">
+            <small>Dividendos projetados — mês</small>
+            <h2 id="rendaMensalProjetada">R$ 0,00</h2>
+            <span class="card-detail" id="rendaMensalDetalhe">Estimativa pelos DYs cadastrados</span>
+          </article>
+
+          <article class="card passive-card">
+            <small>Dividendos projetados — ano</small>
+            <h2 id="rendaAnualProjetada">R$ 0,00</h2>
+            <span class="card-detail">Projeção para os próximos 12 meses</span>
+          </article>
+
+          <article class="card passive-card">
+            <small>Yield on Cost médio</small>
+            <h2 id="yocMedioCarteira">0,00%</h2>
+            <span class="card-detail">Renda projetada sobre o valor investido</span>
+          </article>
+
+          <article class="card passive-card">
+            <small>Meta mensal em Real</small>
+            <h2 id="metaMensalResumo">R$ 0,00</h2>
+            <span class="card-detail" id="metaMensalProgresso">Defina sua meta abaixo</span>
+          </article>
+        </section>
+
+        <section class="passive-grid">
+          <article class="panel projection-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Projeção de dividendos</h3>
+                <small>Estimativa mensal com reinvestimento dos rendimentos</small>
+              </div>
+              <select id="periodoProjecao" class="compact-select" aria-label="Período da projeção">
+                <option value="6">6 meses</option>
+                <option value="12" selected>12 meses</option>
+                <option value="24">24 meses</option>
+              </select>
+            </div>
+
+            <div class="projection-chart" id="graficoProjecao"></div>
+            <p class="calculation-note">
+              Projeção baseada no Dividend Yield anual informado em cada ativo. Não representa garantia de pagamento.
+            </p>
+          </article>
+
+          <article class="panel goal-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Meta de renda passiva</h3>
+                <small>Acompanhe a evolução da sua renda mensal</small>
+              </div>
+            </div>
+
+            <div class="goal-form">
+              <label>
+                <span>Objetivo mensal</span>
+                <input id="metaRendaMensal" type="number" min="0" step="100" placeholder="10000">
+              </label>
+              <label>
+                <span>Aporte mensal para simulação</span>
+                <input id="aporteMensal" type="number" min="0" step="100" placeholder="1000">
+              </label>
+            </div>
+
+            <div class="goal-values">
+              <div>
+                <span>Renda projetada hoje</span>
+                <strong id="rendaAtualMeta">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Falta para a meta</span>
+                <strong id="faltaMeta">R$ 0,00</strong>
+              </div>
+            </div>
+
+            <div class="goal-progress" aria-label="Progresso da meta">
+              <span id="barraMeta"></span>
+            </div>
+            <strong class="goal-percent" id="percentualMeta">0,00% da meta atingida</strong>
+          </article>
+        </section>
+
+        <section class="passive-grid lower-passive-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Simulador de reinvestimento</h3>
+                <small>Comparação da renda mensal com e sem reinvestir</small>
+              </div>
+            </div>
+
+            <div class="table-wrapper compact-table-wrapper">
+              <table class="passive-table simulation-table">
+                <thead>
+                  <tr>
+                    <th>Período</th>
+                    <th>Sem reinvestir</th>
+                    <th>Com reinvestimento</th>
+                    <th>Ganho adicional</th>
+                  </tr>
+                </thead>
+                <tbody id="tabelaReinvestimento"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Renda por ativo</h3>
+                <small>Dividend Yield e Yield on Cost projetados</small>
+              </div>
+            </div>
+
+            <div class="table-wrapper compact-table-wrapper">
+              <table class="passive-table">
+                <thead>
+                  <tr>
+                    <th>Ativo</th>
+                    <th>DY</th>
+                    <th>Yield on Cost</th>
+                    <th>Projeção/mês</th>
+                    <th>Projeção/ano</th>
+                  </tr>
+                </thead>
+                <tbody id="tabelaRendaAtivos"></tbody>
+              </table>
+            </div>
+            <div class="empty-state" id="rendaVazia" hidden>
+              <strong>Nenhum DY foi informado.</strong>
+              <span>Edite os ativos e preencha o Dividend Yield anual para gerar as projeções.</span>
+            </div>
+          </article>
+        </section>
       </section>
     </main>
   </div>
@@ -275,6 +434,51 @@
       </div>
     </form>
   </dialog>
+
+  <div class="asset-drawer-backdrop" id="assetDrawerBackdrop" hidden></div>
+  <aside class="asset-drawer" id="assetDrawer" aria-hidden="true" aria-label="Detalhes do ativo">
+    <div class="asset-drawer-header">
+      <div class="asset-drawer-identity">
+        <div class="asset-logo asset-logo-large" id="drawerLogo"></div>
+        <div>
+          <span class="asset-category-label" id="drawerCategoria">Ativo</span>
+          <h2 id="drawerTicker">—</h2>
+          <small id="drawerMoeda">—</small>
+        </div>
+      </div>
+      <button type="button" class="icon-button" id="btnFecharDrawer" aria-label="Fechar detalhes">×</button>
+    </div>
+
+    <div class="asset-drawer-result">
+      <span>Resultado da posição</span>
+      <strong id="drawerResultado">R$ 0,00</strong>
+      <small id="drawerRentabilidade">0,00%</small>
+    </div>
+
+    <div class="asset-detail-grid">
+      <div><span>Quantidade</span><strong id="drawerQuantidade">0</strong></div>
+      <div><span>Preço médio</span><strong id="drawerPrecoMedio">R$ 0,00</strong></div>
+      <div><span>Cotação atual</span><strong id="drawerCotacao">R$ 0,00</strong></div>
+      <div><span>Valor investido</span><strong id="drawerInvestido">R$ 0,00</strong></div>
+      <div><span>Valor de mercado</span><strong id="drawerMercado">R$ 0,00</strong></div>
+      <div><span>Dividend Yield</span><strong id="drawerDy">0,00%</strong></div>
+    </div>
+
+    <section class="drawer-income-card">
+      <span>Seu Yield on Cost</span>
+      <strong id="drawerYoc">0,00% ao ano</strong>
+      <p id="drawerYocMensal">Equivale a 0,00% ao mês sobre o valor investido.</p>
+      <div class="drawer-income-values">
+        <div><span>Projeção mensal</span><strong id="drawerRendaMensal">R$ 0,00</strong></div>
+        <div><span>Projeção anual</span><strong id="drawerRendaAnual">R$ 0,00</strong></div>
+      </div>
+    </section>
+
+    <div class="asset-drawer-actions">
+      <button type="button" id="btnDrawerEditar">Editar ativo</button>
+      <button type="button" class="secondary" id="btnDrawerExcluir">Excluir</button>
+    </div>
+  </aside>
 
   <dialog id="modalExcluir" class="confirm-dialog">
     <div class="confirm-content">
