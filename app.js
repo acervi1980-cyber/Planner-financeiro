@@ -2,6 +2,7 @@ const STORAGE_KEY = "planner";
 const THEME_KEY = "planner-theme";
 const BACKUP_VERSION = 3;
 const PASSIVE_SETTINGS_KEY = "planner-passive-settings";
+const QUOTES_CONFIG_KEY = "planner-quotes-config";
 
 const modal = document.getElementById("modal");
 const modalExcluir = document.getElementById("modalExcluir");
@@ -35,6 +36,13 @@ const quotesStatusTitle = document.getElementById("quotesStatusTitle");
 const quotesStatusText = document.getElementById("quotesStatusText");
 const quotesStatusTime = document.getElementById("quotesStatusTime");
 const QUOTES_STATUS_KEY = "planner-quotes-status";
+const modalCotacoes = document.getElementById("modalCotacoes");
+const formCotacoes = document.getElementById("formCotacoes");
+const btnConfigurarCotacoes = document.getElementById("btnConfigurarCotacoes");
+const btnFecharCotacoes = document.getElementById("btnFecharCotacoes");
+const btnCancelarCotacoes = document.getElementById("btnCancelarCotacoes");
+const brapiTokenInput = document.getElementById("brapiToken");
+const finnhubTokenInput = document.getElementById("finnhubToken");
 
 const valorInvestidoEl = document.getElementById("valorInvestido");
 const valorMercadoEl = document.getElementById("valorMercado");
@@ -441,12 +449,8 @@ function obterFontesLogo(ativo) {
     fontes.push(`https://icons.brapi.dev/icons/${encodeURIComponent(chave)}.svg`);
   }
 
-  // Fonte automática por ticker para ações e ETFs dos Estados Unidos.
-  // Caso a imagem não exista, o carregamento segue para as fontes por domínio.
-  if (ehAtivoAmericano) {
-    fontes.push(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(chave)}.png`);
-  }
-
+  // Para ativos dos EUA, usamos apenas domínios conhecidos.
+  // Isso evita associações incorretas entre tickers parecidos e marcas não relacionadas.
   const dominio = LOGO_DOMAINS[chave];
   if (dominio) {
     const host = String(dominio)
@@ -532,9 +536,7 @@ function criarLogoHtml(ativo, classeExtra = "") {
 
   if (fontes.length) {
     const fontesSerializadas = escaparHtml(JSON.stringify(fontes));
-    const fallback = tipoLogo === "empresa"
-      ? `<span class="asset-logo-fallback">${sigla}</span>`
-      : `<span class="asset-logo-icon" aria-hidden="true">${criarIconeSvg(tipoLogo)}</span>`;
+    const fallback = `<span class="asset-logo-icon" aria-hidden="true">${criarIconeSvg(tipoLogo)}</span>`;
 
     return `
       <div class="${classes}" data-logo-ticker="${escaparHtml(ativo.t)}">
@@ -552,10 +554,6 @@ function criarLogoHtml(ativo, classeExtra = "") {
         >
       </div>
     `;
-  }
-
-  if (tipoLogo === "empresa") {
-    return `<div class="${classes}"><span class="asset-logo-fallback">${sigla}</span></div>`;
   }
 
   return `
@@ -1287,59 +1285,291 @@ function formatarDataHoraCotacoes(dataIso) {
   }).format(data);
 }
 
-function carregarStatusCotacoes() {
-  let ultimaVerificacao = "";
-
+function carregarConfiguracaoCotacoes() {
   try {
-    ultimaVerificacao = localStorage.getItem(QUOTES_STATUS_KEY) || "";
+    const dados = JSON.parse(localStorage.getItem(QUOTES_CONFIG_KEY) || "{}");
+    return {
+      brapiToken: String(dados.brapiToken || "").trim(),
+      finnhubToken: String(dados.finnhubToken || "").trim()
+    };
+  } catch (erro) {
+    console.warn("Não foi possível ler a configuração das APIs.", erro);
+    return { brapiToken: "", finnhubToken: "" };
+  }
+}
+
+function salvarConfiguracaoCotacoes(configuracao) {
+  localStorage.setItem(QUOTES_CONFIG_KEY, JSON.stringify(configuracao));
+}
+
+function abrirConfiguracaoCotacoes() {
+  const configuracao = carregarConfiguracaoCotacoes();
+  brapiTokenInput.value = configuracao.brapiToken;
+  finnhubTokenInput.value = configuracao.finnhubToken;
+  modalCotacoes.showModal();
+  brapiTokenInput.focus();
+}
+
+function fecharConfiguracaoCotacoes() {
+  modalCotacoes.close();
+}
+
+function formatarDataHoraCotacoes(valor) {
+  if (!valor) return "Nunca atualizado";
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return "Nunca atualizado";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(data);
+}
+
+function definirStatusCotacoes(tipo, titulo, texto, horario = null) {
+  quotesStatusPanel.classList.remove("is-loading", "is-success", "is-warning", "is-error");
+  if (tipo) quotesStatusPanel.classList.add(`is-${tipo}`);
+
+  const icones = {
+    loading: "↻",
+    success: "✓",
+    warning: "!",
+    error: "×"
+  };
+
+  quotesStatusIcon.textContent = icones[tipo] || "◷";
+  quotesStatusTitle.textContent = titulo;
+  quotesStatusText.textContent = texto;
+  quotesStatusTime.textContent = horario ? formatarDataHoraCotacoes(horario) : "—";
+}
+
+function carregarStatusCotacoes() {
+  try {
+    const status = JSON.parse(localStorage.getItem(QUOTES_STATUS_KEY) || "null");
+    if (status?.atualizadoEm) {
+      const falhas = numeroSeguro(status.falhas);
+      definirStatusCotacoes(
+        falhas ? "warning" : "success",
+        `${numeroSeguro(status.atualizados)} ${numeroSeguro(status.atualizados) === 1 ? "cotação atualizada" : "cotações atualizadas"}`,
+        falhas
+          ? `${falhas} ativo(s) não puderam ser consultados e mantiveram o preço anterior.`
+          : "Preços reais carregados e carteira recalculada.",
+        status.atualizadoEm
+      );
+      return;
+    }
   } catch (erro) {
     console.warn("Não foi possível ler o status das cotações.", erro);
   }
 
-  quotesStatusTime.textContent = formatarDataHoraCotacoes(ultimaVerificacao);
+  definirStatusCotacoes(
+    "warning",
+    "Configure as APIs de cotações",
+    "Informe as chaves da brapi e da Finnhub para atualizar B3 e Estados Unidos."
+  );
+}
 
-  if (ultimaVerificacao) {
-    quotesStatusPanel.classList.add("is-success");
-    quotesStatusIcon.textContent = "✓";
-    quotesStatusTitle.textContent = "Carteira conferida";
-    quotesStatusText.textContent = "Estrutura validada. As cotações cadastradas foram mantidas sem alteração.";
+async function fetchJsonComTimeout(url, opcoes = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const resposta = await fetch(url, { ...opcoes, signal: controller.signal });
+    if (!resposta.ok) {
+      let detalhe = "";
+      try {
+        const corpo = await resposta.json();
+        detalhe = corpo?.message || corpo?.error || corpo?.detail || "";
+      } catch {
+        detalhe = "";
+      }
+      throw new Error(`${resposta.status}${detalhe ? ` · ${detalhe}` : ""}`);
+    }
+    return await resposta.json();
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
-function atualizarCotacoes() {
+function ehAtivoB3(ativo) {
+  return ativo.m === "BRL" && ativo.c !== "Renda Fixa";
+}
+
+function ehAtivoEUA(ativo) {
+  return ativo.m === "USD" && (ativo.c === "Stock" || ativo.c === "ETF Internacional");
+}
+
+function dividirEmLotes(lista, tamanho) {
+  const lotes = [];
+  for (let i = 0; i < lista.length; i += tamanho) {
+    lotes.push(lista.slice(i, i + tamanho));
+  }
+  return lotes;
+}
+
+async function consultarBrapi(ativosB3, token) {
+  const precos = new Map();
+  const erros = [];
+  const tickers = [...new Set(ativosB3.map((ativo) => normalizarTickerParaChave(ativo.t)).filter(Boolean))];
+
+  for (const lote of dividirEmLotes(tickers, 20)) {
+    try {
+      const url = `https://brapi.dev/api/v2/stocks/quote?symbols=${encodeURIComponent(lote.join(","))}`;
+      const dados = await fetchJsonComTimeout(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+
+      const resultados = Array.isArray(dados?.results) ? dados.results : [];
+      resultados.forEach((resultado) => {
+        const tickerResultado = normalizarTickerParaChave(resultado?.symbol || resultado?.requestedSymbol);
+        const payload = resultado?.data || resultado;
+        const preco = numeroSeguro(payload?.regularMarketPrice, NaN);
+        if (tickerResultado && Number.isFinite(preco) && preco > 0) {
+          precos.set(tickerResultado, preco);
+        }
+      });
+    } catch (erro) {
+      console.error("Falha ao consultar brapi:", erro);
+      erros.push(`B3: ${erro.message}`);
+    }
+  }
+
+  return { precos, erros };
+}
+
+async function consultarFinnhub(ativosEUA, token) {
+  const precos = new Map();
+  const erros = [];
+  const tickers = [...new Set(ativosEUA.map((ativo) => normalizarTickerParaChave(ativo.t)).filter(Boolean))];
+
+  for (const tickerAtivo of tickers) {
+    try {
+      const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(tickerAtivo)}&token=${encodeURIComponent(token)}`;
+      const dados = await fetchJsonComTimeout(url);
+      const preco = numeroSeguro(dados?.c, NaN);
+      if (Number.isFinite(preco) && preco > 0) {
+        precos.set(tickerAtivo, preco);
+      } else {
+        erros.push(`${tickerAtivo}: cotação indisponível`);
+      }
+    } catch (erro) {
+      console.error(`Falha ao consultar ${tickerAtivo} na Finnhub:`, erro);
+      erros.push(`${tickerAtivo}: ${erro.message}`);
+    }
+
+    // Evita disparar muitas requisições simultâneas no plano gratuito.
+    await new Promise((resolve) => window.setTimeout(resolve, 120));
+  }
+
+  return { precos, erros };
+}
+
+async function atualizarCotacoes() {
   if (!btnAtualizarCotacoes || btnAtualizarCotacoes.disabled) return;
+
+  const configuracao = carregarConfiguracaoCotacoes();
+  const ativosB3 = ativos.filter(ehAtivoB3);
+  const ativosEUA = ativos.filter(ehAtivoEUA);
+  const precisaBrapi = ativosB3.length > 0;
+  const precisaFinnhub = ativosEUA.length > 0;
+
+  if ((precisaBrapi && !configuracao.brapiToken) || (precisaFinnhub && !configuracao.finnhubToken)) {
+    abrirConfiguracaoCotacoes();
+    definirStatusCotacoes(
+      "warning",
+      "Configuração necessária",
+      "Informe as chaves das APIs usadas pelos ativos cadastrados."
+    );
+    return;
+  }
+
+  if (!ativosB3.length && !ativosEUA.length) {
+    definirStatusCotacoes(
+      "warning",
+      "Nenhum ativo compatível",
+      "Cadastre uma ação, FII, BDR, ETF brasileiro, Stock ou ETF dos EUA."
+    );
+    return;
+  }
 
   btnAtualizarCotacoes.disabled = true;
   btnAtualizarCotacoes.classList.add("is-loading");
-  btnAtualizarCotacoes.textContent = "Verificando...";
-  quotesStatusPanel.classList.remove("is-success");
-  quotesStatusPanel.classList.add("is-loading");
-  quotesStatusIcon.textContent = "↻";
-  quotesStatusTitle.textContent = "Verificando a estrutura de cotações";
-  quotesStatusText.textContent = "Conferindo tickers, moedas e preços cadastrados na carteira...";
-  quotesStatusTime.textContent = "Em andamento";
+  btnAtualizarCotacoes.textContent = "Atualizando...";
+  definirStatusCotacoes(
+    "loading",
+    "Buscando preços reais",
+    `Consultando ${ativosB3.length} ativo(s) da B3 e ${ativosEUA.length} ativo(s) dos EUA...`
+  );
 
-  window.setTimeout(() => {
-    const ativosValidos = ativos.filter((ativo) => ativo.t && ativo.m && Number.isFinite(Number(ativo.cot)));
-    const agora = new Date().toISOString();
+  try {
+    const [resultadoB3, resultadoEUA] = await Promise.all([
+      ativosB3.length
+        ? consultarBrapi(ativosB3, configuracao.brapiToken)
+        : Promise.resolve({ precos: new Map(), erros: [] }),
+      ativosEUA.length
+        ? consultarFinnhub(ativosEUA, configuracao.finnhubToken)
+        : Promise.resolve({ precos: new Map(), erros: [] })
+    ]);
 
-    try {
-      localStorage.setItem(QUOTES_STATUS_KEY, agora);
-    } catch (erro) {
-      console.warn("Não foi possível salvar o status das cotações.", erro);
+    let atualizados = 0;
+    let falhas = 0;
+
+    ativos.forEach((ativo) => {
+      const chave = normalizarTickerParaChave(ativo.t);
+      const novoPreco = ehAtivoB3(ativo)
+        ? resultadoB3.precos.get(chave)
+        : ehAtivoEUA(ativo)
+          ? resultadoEUA.precos.get(chave)
+          : null;
+
+      if (Number.isFinite(novoPreco) && novoPreco > 0) {
+        ativo.cot = novoPreco;
+        atualizados += 1;
+      } else if (ehAtivoB3(ativo) || ehAtivoEUA(ativo)) {
+        falhas += 1;
+      }
+    });
+
+    const atualizadoEm = new Date().toISOString();
+    localStorage.setItem(QUOTES_STATUS_KEY, JSON.stringify({
+      atualizadoEm,
+      atualizados,
+      falhas
+    }));
+
+    atualizar();
+
+    if (atualizados === 0) {
+      const detalhes = [...resultadoB3.erros, ...resultadoEUA.erros].slice(0, 2).join(" · ");
+      definirStatusCotacoes(
+        "error",
+        "Nenhuma cotação foi atualizada",
+        detalhes || "Confira os tickers, as chaves das APIs e os limites dos planos.",
+        atualizadoEm
+      );
+      mostrarToast("Não foi possível atualizar as cotações.", "error");
+    } else {
+      definirStatusCotacoes(
+        falhas ? "warning" : "success",
+        `${atualizados} ${atualizados === 1 ? "cotação atualizada" : "cotações atualizadas"}`,
+        falhas
+          ? `${falhas} ativo(s) mantiveram o preço anterior por indisponibilidade ou ticker inválido.`
+          : "Preços reais carregados e carteira recalculada.",
+        atualizadoEm
+      );
+      mostrarToast(`${atualizados} ${atualizados === 1 ? "cotação atualizada" : "cotações atualizadas"}.`);
     }
-
-    quotesStatusPanel.classList.remove("is-loading");
-    quotesStatusPanel.classList.add("is-success");
-    quotesStatusIcon.textContent = "✓";
-    quotesStatusTitle.textContent = `${ativosValidos.length} ${ativosValidos.length === 1 ? "ativo conferido" : "ativos conferidos"}`;
-    quotesStatusText.textContent = "Módulo v1.5 ativo. Nenhum preço foi alterado; a conexão com a API será feita na próxima etapa.";
-    quotesStatusTime.textContent = formatarDataHoraCotacoes(agora);
+  } catch (erro) {
+    console.error("Erro inesperado ao atualizar cotações:", erro);
+    definirStatusCotacoes(
+      "error",
+      "Falha na atualização",
+      "Não foi possível concluir a consulta. Confira sua conexão e as chaves das APIs."
+    );
+    mostrarToast("Falha ao atualizar cotações.", "error");
+  } finally {
     btnAtualizarCotacoes.disabled = false;
     btnAtualizarCotacoes.classList.remove("is-loading");
     btnAtualizarCotacoes.textContent = "↻ Atualizar cotações";
-    mostrarToast("Central de cotações verificada com sucesso.");
-  }, 900);
+  }
 }
 
 document.getElementById("btnAdicionar").addEventListener("click", abrirModalNovoAtivo);
@@ -1349,8 +1579,23 @@ document.getElementById("btnCancelarExclusao").addEventListener("click", fecharM
 document.getElementById("btnExportar").addEventListener("click", exportarBackup);
 document.getElementById("btnImportar").addEventListener("click", () => arquivoImportacao.click());
 btnAtualizarCotacoes.addEventListener("click", atualizarCotacoes);
+btnConfigurarCotacoes.addEventListener("click", abrirConfiguracaoCotacoes);
+btnFecharCotacoes.addEventListener("click", fecharConfiguracaoCotacoes);
+btnCancelarCotacoes.addEventListener("click", fecharConfiguracaoCotacoes);
 document.getElementById("btnConfirmarImportacao").addEventListener("click", confirmarImportacao);
 document.getElementById("btnCancelarImportacao").addEventListener("click", cancelarImportacao);
+
+
+formCotacoes.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  salvarConfiguracaoCotacoes({
+    brapiToken: brapiTokenInput.value.trim(),
+    finnhubToken: finnhubTokenInput.value.trim()
+  });
+  fecharConfiguracaoCotacoes();
+  mostrarToast("Configuração das APIs salva.");
+  await atualizarCotacoes();
+});
 
 
 menuViewLinks.forEach((link) => {

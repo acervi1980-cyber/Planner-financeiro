@@ -1690,3 +1690,81 @@ html[data-theme="dark"] .asset-logo.has-image {
   width: 80%;
   height: 80%;
 }
+
+/* ===== Planner v1.7 — Cotações reais ===== */
+.quotes-config-dialog {
+  width: min(620px, calc(100% - 32px));
+}
+
+.api-config-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.api-config-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.api-provider {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.api-config-card small {
+  line-height: 1.45;
+}
+
+.api-config-card input {
+  width: 100%;
+  margin-top: 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--input);
+  color: var(--text);
+  outline: none;
+}
+
+.api-config-card input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.api-security-note {
+  margin: 14px 0 0;
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: var(--green-soft);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.quotes-status-panel.is-warning {
+  border-color: color-mix(in srgb, var(--gold) 48%, var(--line));
+}
+
+.quotes-status-panel.is-warning .quotes-status-icon {
+  color: #9a6a00;
+}
+
+.quotes-status-panel.is-error {
+  border-color: color-mix(in srgb, var(--loss) 45%, var(--line));
+}
+
+.quotes-status-panel.is-error .quotes-status-icon {
+  color: var(--loss);
+}
+
+/* Quando uma imagem existe, exibe somente a marca. O ticker permanece ao lado. */
+.asset-logo.has-image .asset-logo-fallback,
+.asset-logo.has-image .asset-logo-icon {
+  display: none !important;
+}

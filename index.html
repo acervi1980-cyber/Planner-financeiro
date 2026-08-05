@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.6</title>
+  <title>Planner Financeiro · v1.7</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.6 · Logotipos automáticos</span>
+        <span>Versão 1.7 · Cotações reais</span>
       </div>
     </aside>
 
@@ -132,6 +132,7 @@
 
           <div class="data-actions">
             <button type="button" class="quote-update-button compact-button" id="btnAtualizarCotacoes">↻ Atualizar cotações</button>
+            <button type="button" class="secondary compact-button" id="btnConfigurarCotacoes">⚙ Configurar APIs</button>
             <button type="button" class="secondary compact-button" id="btnExportar">Exportar backup</button>
             <button type="button" class="secondary compact-button" id="btnImportar">Importar backup</button>
             <input type="file" id="arquivoImportacao" accept=".json,application/json" hidden>
@@ -141,8 +142,8 @@
         <div class="quotes-status-panel" id="quotesStatusPanel" aria-live="polite">
           <div class="quotes-status-icon" id="quotesStatusIcon" aria-hidden="true">◷</div>
           <div class="quotes-status-copy">
-            <strong id="quotesStatusTitle">Cotações prontas para conferência</strong>
-            <span id="quotesStatusText">Os preços cadastrados permanecem preservados até a conexão com uma API de mercado.</span>
+            <strong id="quotesStatusTitle">Cotações reais disponíveis</strong>
+            <span id="quotesStatusText">Configure as chaves das APIs e clique em “Atualizar cotações”.</span>
           </div>
           <span class="quotes-status-time" id="quotesStatusTime">Nunca verificado</span>
         </div>
@@ -506,6 +507,42 @@
       <button type="button" id="btnConfirmarImportacao">Importar</button>
       <button type="button" class="secondary" id="btnCancelarImportacao">Cancelar</button>
     </div>
+  </dialog>
+
+
+  <dialog id="modalCotacoes" class="quotes-config-dialog">
+    <form id="formCotacoes">
+      <div class="dialog-heading">
+        <div>
+          <h3>Configurar cotações reais</h3>
+          <small>As chaves ficam salvas somente neste navegador.</small>
+        </div>
+        <button type="button" class="icon-button close-button" id="btnFecharCotacoes" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="api-config-grid">
+        <label class="api-config-card">
+          <span class="api-provider">B3 · brapi</span>
+          <small>Ações, FIIs, BDRs e ETFs brasileiros.</small>
+          <input id="brapiToken" type="password" autocomplete="off" placeholder="Cole o token da brapi">
+        </label>
+
+        <label class="api-config-card">
+          <span class="api-provider">Estados Unidos · Finnhub</span>
+          <small>Stocks e ETFs negociados nos EUA.</small>
+          <input id="finnhubToken" type="password" autocomplete="off" placeholder="Cole a API key da Finnhub">
+        </label>
+      </div>
+
+      <p class="api-security-note">
+        Esta versão é um protótipo pessoal e armazena as chaves no seu navegador. Para uso público ou comercial, o ideal é mover as chamadas para funções protegidas no Netlify.
+      </p>
+
+      <div class="dialog-actions">
+        <button type="submit">Salvar e atualizar</button>
+        <button type="button" class="secondary" id="btnCancelarCotacoes">Cancelar</button>
+      </div>
+    </form>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
