@@ -1691,80 +1691,184 @@ html[data-theme="dark"] .asset-logo.has-image {
   height: 80%;
 }
 
-/* ===== Planner v1.7 — Cotações reais ===== */
-.quotes-config-dialog {
-  width: min(620px, calc(100% - 32px));
+
+/* ===== Planner v1.7 — Interface de cotações e configurações ===== */
+.settings-dialog {
+  width: min(760px, calc(100% - 32px));
 }
 
-.api-config-grid {
+.settings-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-provider-list {
   display: grid;
   gap: 12px;
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
-.api-config-card {
-  display: grid;
-  gap: 6px;
-  padding: 14px;
+.settings-provider-card {
+  padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 13px;
   background: var(--card);
 }
 
-.api-provider {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 750;
+.provider-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
 }
 
-.api-config-card small {
-  line-height: 1.45;
+.provider-heading strong,
+.provider-heading span {
+  display: block;
 }
 
-.api-config-card input {
-  width: 100%;
-  margin-top: 4px;
-  padding: 11px 12px;
+.provider-heading > div:nth-child(2) span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.provider-brand {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.provider-brand-brapi {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.provider-brand-finnhub {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.provider-status {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.provider-status.is-configured {
+  background: var(--profit-soft);
+  color: var(--profit);
+}
+
+.settings-token-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.token-input-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--input);
-  color: var(--text);
-  outline: none;
 }
 
-.api-config-card input:focus {
+.token-input-wrap:focus-within {
   border-color: var(--green);
   box-shadow: 0 0 0 3px var(--focus);
 }
 
-.api-security-note {
-  margin: 14px 0 0;
-  padding: 11px 12px;
-  border-radius: 10px;
-  background: var(--green-soft);
-  color: var(--muted);
+.token-input-wrap input {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none !important;
+}
+
+.token-visibility {
+  padding: 0 13px;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--green);
   font-size: 12px;
-  line-height: 1.5;
+  font-weight: 700;
 }
 
-.quotes-status-panel.is-warning {
-  border-color: color-mix(in srgb, var(--gold) 48%, var(--line));
+.settings-security-note {
+  display: flex;
+  gap: 11px;
+  margin-top: 14px;
+  padding: 13px 14px;
+  border-radius: 11px;
+  background: var(--green-soft);
 }
 
-.quotes-status-panel.is-warning .quotes-status-icon {
-  color: #9a6a00;
+.settings-security-note strong {
+  font-size: 12px;
 }
 
-.quotes-status-panel.is-error {
-  border-color: color-mix(in srgb, var(--loss) 45%, var(--line));
+.settings-security-note p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
-.quotes-status-panel.is-error .quotes-status-icon {
-  color: var(--loss);
+.asset-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
 }
 
-/* Quando uma imagem existe, exibe somente a marca. O ticker permanece ao lado. */
-.asset-logo.has-image .asset-logo-fallback,
-.asset-logo.has-image .asset-logo-icon {
+.asset-logo.has-image img {
+  width: 84%;
+  height: 84%;
+}
+
+.asset-logo-fallback {
   display: none !important;
+}
+
+.asset-logo-icon {
+  width: 58%;
+  height: 58%;
+}
+
+.asset-name strong {
+  font-size: 15px;
+}
+
+@media (max-width: 560px) {
+  .provider-heading {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .provider-status {
+    grid-column: 2;
+    width: fit-content;
+  }
+
+  .settings-actions {
+    grid-template-columns: 1fr;
+  }
 }

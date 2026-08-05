@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.7 · Cotações reais</span>
+        <span>Versão 1.7 · Interface de cotações</span>
       </div>
     </aside>
 
@@ -44,6 +44,10 @@
         </div>
 
         <div class="top-actions">
+          <button type="button" class="secondary compact-button" id="btnConfiguracoes">
+            <span aria-hidden="true">⚙</span>
+            <span>Configurações</span>
+          </button>
           <button type="button" class="secondary compact-button" id="btnTema" aria-pressed="false">
             <span id="iconeTema" aria-hidden="true">☾</span>
             <span id="textoTema">Modo escuro</span>
@@ -132,7 +136,6 @@
 
           <div class="data-actions">
             <button type="button" class="quote-update-button compact-button" id="btnAtualizarCotacoes">↻ Atualizar cotações</button>
-            <button type="button" class="secondary compact-button" id="btnConfigurarCotacoes">⚙ Configurar APIs</button>
             <button type="button" class="secondary compact-button" id="btnExportar">Exportar backup</button>
             <button type="button" class="secondary compact-button" id="btnImportar">Importar backup</button>
             <input type="file" id="arquivoImportacao" accept=".json,application/json" hidden>
@@ -142,8 +145,8 @@
         <div class="quotes-status-panel" id="quotesStatusPanel" aria-live="polite">
           <div class="quotes-status-icon" id="quotesStatusIcon" aria-hidden="true">◷</div>
           <div class="quotes-status-copy">
-            <strong id="quotesStatusTitle">Cotações reais disponíveis</strong>
-            <span id="quotesStatusText">Configure as chaves das APIs e clique em “Atualizar cotações”.</span>
+            <strong id="quotesStatusTitle">Central de cotações preparada</strong>
+            <span id="quotesStatusText">Configure as fontes de mercado para ativar a atualização de preços reais.</span>
           </div>
           <span class="quotes-status-time" id="quotesStatusTime">Nunca verificado</span>
         </div>
@@ -481,6 +484,70 @@
     </div>
   </aside>
 
+  <dialog id="modalConfiguracoes" class="settings-dialog">
+    <form id="formConfiguracoes">
+      <div class="dialog-heading">
+        <div>
+          <span class="settings-eyebrow">Integrações de mercado</span>
+          <h3>Configurações de cotações</h3>
+          <small>Cadastre as chaves que serão usadas para consultar ativos brasileiros e americanos.</small>
+        </div>
+        <button type="button" class="icon-button close-button" id="btnFecharConfiguracoes" aria-label="Fechar configurações">×</button>
+      </div>
+
+      <div class="settings-provider-list">
+        <section class="settings-provider-card">
+          <div class="provider-heading">
+            <div class="provider-brand provider-brand-brapi">BR</div>
+            <div>
+              <strong>BRAPI</strong>
+              <span>Ações, FIIs, BDRs e ETFs da B3</span>
+            </div>
+            <span class="provider-status" id="statusBrapi">Não configurada</span>
+          </div>
+          <label class="settings-token-field" for="brapiToken">
+            <span>Token da BRAPI</span>
+            <div class="token-input-wrap">
+              <input id="brapiToken" type="password" autocomplete="off" placeholder="Cole o token da BRAPI">
+              <button type="button" class="token-visibility" data-target="brapiToken" aria-label="Mostrar ou ocultar token">Mostrar</button>
+            </div>
+          </label>
+        </section>
+
+        <section class="settings-provider-card">
+          <div class="provider-heading">
+            <div class="provider-brand provider-brand-finnhub">US</div>
+            <div>
+              <strong>Finnhub</strong>
+              <span>Stocks e ETFs negociados nos Estados Unidos</span>
+            </div>
+            <span class="provider-status" id="statusFinnhub">Não configurada</span>
+          </div>
+          <label class="settings-token-field" for="finnhubToken">
+            <span>API Key da Finnhub</span>
+            <div class="token-input-wrap">
+              <input id="finnhubToken" type="password" autocomplete="off" placeholder="Cole a API Key da Finnhub">
+              <button type="button" class="token-visibility" data-target="finnhubToken" aria-label="Mostrar ou ocultar chave">Mostrar</button>
+            </div>
+          </label>
+        </section>
+      </div>
+
+      <div class="settings-security-note">
+        <span aria-hidden="true">🔒</span>
+        <div>
+          <strong>Armazenamento local</strong>
+          <p>As chaves ficam salvas somente neste navegador. Nesta etapa, a interface está pronta; a consulta real será ligada ao botão Atualizar cotações na próxima atualização.</p>
+        </div>
+      </div>
+
+      <div class="dialog-actions settings-actions">
+        <button type="button" class="secondary" id="btnLimparConfiguracoes">Limpar</button>
+        <button type="submit" id="btnSalvarConfiguracoes">Salvar configurações</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="modalExcluir" class="confirm-dialog">
     <div class="confirm-content">
       <div class="confirm-icon" aria-hidden="true">!</div>
@@ -507,42 +574,6 @@
       <button type="button" id="btnConfirmarImportacao">Importar</button>
       <button type="button" class="secondary" id="btnCancelarImportacao">Cancelar</button>
     </div>
-  </dialog>
-
-
-  <dialog id="modalCotacoes" class="quotes-config-dialog">
-    <form id="formCotacoes">
-      <div class="dialog-heading">
-        <div>
-          <h3>Configurar cotações reais</h3>
-          <small>As chaves ficam salvas somente neste navegador.</small>
-        </div>
-        <button type="button" class="icon-button close-button" id="btnFecharCotacoes" aria-label="Fechar">×</button>
-      </div>
-
-      <div class="api-config-grid">
-        <label class="api-config-card">
-          <span class="api-provider">B3 · brapi</span>
-          <small>Ações, FIIs, BDRs e ETFs brasileiros.</small>
-          <input id="brapiToken" type="password" autocomplete="off" placeholder="Cole o token da brapi">
-        </label>
-
-        <label class="api-config-card">
-          <span class="api-provider">Estados Unidos · Finnhub</span>
-          <small>Stocks e ETFs negociados nos EUA.</small>
-          <input id="finnhubToken" type="password" autocomplete="off" placeholder="Cole a API key da Finnhub">
-        </label>
-      </div>
-
-      <p class="api-security-note">
-        Esta versão é um protótipo pessoal e armazena as chaves no seu navegador. Para uso público ou comercial, o ideal é mover as chamadas para funções protegidas no Netlify.
-      </p>
-
-      <div class="dialog-actions">
-        <button type="submit">Salvar e atualizar</button>
-        <button type="button" class="secondary" id="btnCancelarCotacoes">Cancelar</button>
-      </div>
-    </form>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
