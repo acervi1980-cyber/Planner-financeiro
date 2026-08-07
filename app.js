@@ -47,6 +47,14 @@ const indicadorFavoritos = document.getElementById("indicadorFavoritos");
 const indicadorDyBRL = document.getElementById("indicadorDyBRL");
 const indicadorDyUSD = document.getElementById("indicadorDyUSD");
 const indicadorRendimentos = document.getElementById("indicadorRendimentos");
+const resumoBRLQuantidade = document.getElementById("resumoBRLQuantidade");
+const resumoBRLInvestido = document.getElementById("resumoBRLInvestido");
+const resumoBRLMercado = document.getElementById("resumoBRLMercado");
+const resumoBRLResultado = document.getElementById("resumoBRLResultado");
+const resumoUSDQuantidade = document.getElementById("resumoUSDQuantidade");
+const resumoUSDInvestido = document.getElementById("resumoUSDInvestido");
+const resumoUSDMercado = document.getElementById("resumoUSDMercado");
+const resumoUSDResultado = document.getElementById("resumoUSDResultado");
 const btnTema = document.getElementById("btnTema");
 const iconeTema = document.getElementById("iconeTema");
 const textoTema = document.getElementById("textoTema");
@@ -725,10 +733,32 @@ function atualizar() {
   contadorAtivos.textContent = formatarContador(ativosVisiveis.length, ativos.length);
 
   atualizarIndicadores(totais, possuiBRL, possuiUSD);
+  atualizarResumoPorMoeda(totais);
   renderizarAlocacao();
 
   salvarLocalmente();
   atualizarRendaPassiva();
+}
+
+function atualizarResumoPorMoeda(totais) {
+  const quantidadeBRL = ativos.filter((ativo) => ativo.m === "BRL").length;
+  const quantidadeUSD = ativos.filter((ativo) => ativo.m === "USD").length;
+
+  if (resumoBRLQuantidade) resumoBRLQuantidade.textContent = `${quantidadeBRL} ${quantidadeBRL === 1 ? "ativo" : "ativos"}`;
+  if (resumoBRLInvestido) resumoBRLInvestido.textContent = formatarMoeda(totais.BRL.investido, "BRL");
+  if (resumoBRLMercado) resumoBRLMercado.textContent = formatarMoeda(totais.BRL.mercado, "BRL");
+  if (resumoBRLResultado) {
+    resumoBRLResultado.textContent = formatarMoeda(totais.BRL.lucro, "BRL");
+    resumoBRLResultado.className = classeResultado(totais.BRL.lucro);
+  }
+
+  if (resumoUSDQuantidade) resumoUSDQuantidade.textContent = `${quantidadeUSD} ${quantidadeUSD === 1 ? "ativo" : "ativos"}`;
+  if (resumoUSDInvestido) resumoUSDInvestido.textContent = formatarMoeda(totais.USD.investido, "USD");
+  if (resumoUSDMercado) resumoUSDMercado.textContent = formatarMoeda(totais.USD.mercado, "USD");
+  if (resumoUSDResultado) {
+    resumoUSDResultado.textContent = formatarMoeda(totais.USD.lucro, "USD");
+    resumoUSDResultado.className = classeResultado(totais.USD.lucro);
+  }
 }
 
 function formatarResumo(valorBRL, valorUSD, possuiBRL, possuiUSD) {
