@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.9.1</title>
+  <title>Planner Financeiro · v1.9.2</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.9.1 · Logos aprimorados e desempenho</span>
+        <span>Versão 1.9.2 · Resumo limpo e logotipos</span>
       </div>
     </aside>
 
@@ -53,6 +53,16 @@
       </header>
 
       <div class="app-view active" id="viewDashboard">
+      <div class="summary-toolbar" aria-label="Moeda do resumo">
+        <div>
+          <strong>Resumo da carteira</strong>
+          <small>Escolha uma moeda para evitar informações duplicadas nos cartões.</small>
+        </div>
+        <div class="currency-toggle" role="group" aria-label="Moeda exibida no resumo">
+          <button type="button" class="summary-currency-button active" data-summary-currency="BRL">R$ Real</button>
+          <button type="button" class="summary-currency-button" data-summary-currency="USD">US$ Dólar</button>
+        </div>
+      </div>
       <section class="cards" aria-label="Resumo da carteira">
         <article class="card">
           <small>Valor Investido</small>
@@ -63,7 +73,7 @@
         <article class="card">
           <small>Valor de Mercado</small>
           <h2 id="valorMercado">R$ 0,00</h2>
-          <span class="card-detail">Patrimônio atual da carteira</span>
+          <span class="card-detail" id="detalheMercado">Patrimônio atual da carteira</span>
         </article>
 
         <article class="card">

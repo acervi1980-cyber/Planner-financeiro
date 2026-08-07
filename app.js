@@ -2,6 +2,7 @@ const STORAGE_KEY = "planner";
 const THEME_KEY = "planner-theme";
 const BACKUP_VERSION = 3;
 const PASSIVE_SETTINGS_KEY = "planner-passive-settings";
+const SUMMARY_CURRENCY_KEY = "planner-summary-currency";
 
 const modal = document.getElementById("modal");
 const modalExcluir = document.getElementById("modalExcluir");
@@ -41,6 +42,8 @@ const valorMercadoEl = document.getElementById("valorMercado");
 const lucroPrejuizoEl = document.getElementById("lucroPrejuizo");
 const rentabilidadeCarteiraEl = document.getElementById("rentabilidadeCarteira");
 const detalheInvestidoEl = document.getElementById("detalheInvestido");
+const detalheMercadoEl = document.getElementById("detalheMercado");
+const summaryCurrencyButtons = document.querySelectorAll("[data-summary-currency]");
 const alocacaoConteudo = document.getElementById("alocacaoConteudo");
 const indicadorQuantidade = document.getElementById("indicadorQuantidade");
 const indicadorFavoritos = document.getElementById("indicadorFavoritos");
@@ -124,6 +127,7 @@ let ordenacao = { campo: "t", direcao: "asc" };
 let toastTimeout = null;
 let passiveSettings = carregarConfiguracoesRenda();
 let ativoNoDrawerId = null;
+let moedaResumo = localStorage.getItem(SUMMARY_CURRENCY_KEY) === "USD" ? "USD" : "BRL";
 
 function criarId() {
   if (window.crypto?.randomUUID) {
@@ -556,22 +560,19 @@ function criarIconeSvg(tipo) {
 
 function criarLogoHtml(ativo, classeExtra = "") {
   const fontes = obterFontesLogo(ativo);
-  const sigla = siglaAtivo(ativo.t);
   const tipoLogo = tipoLogoAtivo(ativo);
   const classes = ["asset-logo", classeExtra, `asset-logo-${tipoLogo}`].filter(Boolean).join(" ");
+  const fallback = `<span class="asset-logo-icon asset-logo-placeholder" aria-hidden="true">${criarIconeSvg(tipoLogo)}</span>`;
 
   if (fontes.length) {
     const fontesSerializadas = escaparHtml(JSON.stringify(fontes));
-    const fallback = tipoLogo === "empresa"
-      ? `<span class="asset-logo-fallback">${sigla}</span>`
-      : `<span class="asset-logo-icon" aria-hidden="true">${criarIconeSvg(tipoLogo)}</span>`;
 
     return `
       <div class="${classes}" data-logo-ticker="${escaparHtml(ativo.t)}">
         ${fallback}
         <img
           src="${fontes[0]}"
-          alt=""
+          alt="Logotipo ${escaparHtml(ativo.t)}"
           loading="lazy"
           decoding="async"
           referrerpolicy="no-referrer"
@@ -584,13 +585,9 @@ function criarLogoHtml(ativo, classeExtra = "") {
     `;
   }
 
-  if (tipoLogo === "empresa") {
-    return `<div class="${classes}"><span class="asset-logo-fallback">${sigla}</span></div>`;
-  }
-
   return `
     <div class="${classes}">
-      <span class="asset-logo-icon" aria-hidden="true">${criarIconeSvg(tipoLogo)}</span>
+      ${fallback}
     </div>
   `;
 }
@@ -601,7 +598,7 @@ function preencherLogoDrawer(ativo) {
   const logoGerado = wrapper.firstElementChild;
 
   drawerLogo.className = logoGerado?.className || "asset-logo asset-logo-large";
-  drawerLogo.innerHTML = logoGerado?.innerHTML || `<span class="asset-logo-fallback">${siglaAtivo(ativo.t)}</span>`;
+  drawerLogo.innerHTML = logoGerado?.innerHTML || `<span class="asset-logo-icon asset-logo-placeholder" aria-hidden="true">${criarIconeSvg(tipoLogoAtivo(ativo))}</span>`;
 }
 
 function abrirDrawerAtivo(id) {
@@ -708,38 +705,28 @@ function atualizar() {
   const possuiBRL = ativos.some((ativo) => ativo.m === "BRL");
   const possuiUSD = ativos.some((ativo) => ativo.m === "USD");
 
-  valorInvestidoEl.textContent = formatarResumo(
-    totais.BRL.investido,
-    totais.USD.investido,
-    possuiBRL,
-    possuiUSD
-  );
+  const totalResumo = totais[moedaResumo];
+  const ativosNaMoeda = ativos.filter((ativo) => ativo.m === moedaResumo).length;
+  const nomeMoeda = moedaResumo === "USD" ? "Dólar" : "Real";
 
-  valorMercadoEl.textContent = formatarResumo(
-    totais.BRL.mercado,
-    totais.USD.mercado,
-    possuiBRL,
-    possuiUSD
-  );
+  valorInvestidoEl.textContent = formatarMoeda(totalResumo.investido, moedaResumo);
+  valorMercadoEl.textContent = formatarMoeda(totalResumo.mercado, moedaResumo);
+  lucroPrejuizoEl.textContent = formatarMoeda(totalResumo.lucro, moedaResumo);
 
-  lucroPrejuizoEl.textContent = formatarResumo(
-    totais.BRL.lucro,
-    totais.USD.lucro,
-    possuiBRL,
-    possuiUSD
-  );
-
-  const resultadoSinal = totais.BRL.lucro + totais.USD.lucro;
+  const resultadoSinal = totalResumo.lucro;
   lucroPrejuizoEl.className = classeResultado(resultadoSinal);
 
-  rentabilidadeCarteiraEl.textContent = formatarRentabilidadeResumo(
-    totais,
-    possuiBRL,
-    possuiUSD
-  );
+  rentabilidadeCarteiraEl.textContent = formatarPercentual(totalResumo.rentabilidade);
   rentabilidadeCarteiraEl.className = `card-detail ${classeResultado(resultadoSinal)}`;
 
-  detalheInvestidoEl.textContent = formatarContador(ativos.length, ativos.length);
+  detalheInvestidoEl.textContent = `${ativosNaMoeda} ${ativosNaMoeda === 1 ? "ativo" : "ativos"} em ${nomeMoeda}`;
+  detalheMercadoEl.textContent = `Patrimônio da carteira em ${nomeMoeda}`;
+
+  summaryCurrencyButtons.forEach((botao) => {
+    const ativo = botao.dataset.summaryCurrency === moedaResumo;
+    botao.classList.toggle("active", ativo);
+    botao.setAttribute("aria-pressed", String(ativo));
+  });
   estadoVazio.hidden = ativosVisiveis.length > 0;
   contadorAtivos.textContent = formatarContador(ativosVisiveis.length, ativos.length);
 
@@ -1479,6 +1466,15 @@ tabela.addEventListener("keydown", (evento) => {
   abrirDrawerAtivo(linha.dataset.id);
 });
 
+
+
+summaryCurrencyButtons.forEach((botao) => {
+  botao.addEventListener("click", () => {
+    moedaResumo = botao.dataset.summaryCurrency === "USD" ? "USD" : "BRL";
+    localStorage.setItem(SUMMARY_CURRENCY_KEY, moedaResumo);
+    atualizar();
+  });
+});
 
 btnFecharDrawer.addEventListener("click", fecharDrawerAtivo);
 assetDrawerBackdrop.addEventListener("click", fecharDrawerAtivo);
