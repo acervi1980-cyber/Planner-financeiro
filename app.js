@@ -429,6 +429,9 @@ function obterFontesLogo(ativo) {
   const chave = normalizarTickerParaChave(ativo?.t);
   if (!chave) return [];
 
+  // FIIs usam sempre o ícone padrão de prédio para manter a carteira uniforme.
+  if (ativo?.c === "FII" || ativo?.c === "Renda Fixa") return [];
+
   const fontes = [];
   const ehAtivoB3 = ativo?.m === "BRL" && ativo?.c !== "Renda Fixa";
   const ehAtivoAmericano =
@@ -541,7 +544,9 @@ function criarLogoHtml(ativo, classeExtra = "") {
         ${fallback}
         <img
           src="${fontes[0]}"
-          alt=""
+          alt="Logotipo de ${escaparHtml(ativo.t)}"
+          width="128"
+          height="128"
           loading="lazy"
           decoding="async"
           referrerpolicy="no-referrer"
