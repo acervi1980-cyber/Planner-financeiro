@@ -1837,3 +1837,13 @@ html[data-theme="dark"] .asset-logo.has-image {
 .quotes-status-panel.is-error .quotes-status-icon {
   color: var(--loss);
 }
+
+
+/* ===== Planner v1.9.4 — Consolidação de compras ===== */
+.field-hint {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}

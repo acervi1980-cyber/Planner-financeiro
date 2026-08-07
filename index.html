@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.9.3</title>
+  <title>Planner Financeiro · v1.9.4</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.9.3 · Cotações BRAPI</span>
+        <span>Versão 1.9.4 · Consolidação + BRAPI</span>
       </div>
     </aside>
 
@@ -417,13 +417,14 @@
         </div>
 
         <div class="field-group">
-          <label for="pm">Preço médio</label>
+          <label id="labelPrecoMedio" for="pm">Preço da compra</label>
           <input id="pm" type="number" min="0" step="0.01" placeholder="0,00" required>
+          <small class="field-hint" id="hintPrecoMedio">Em nova compra, o preço médio é recalculado automaticamente.</small>
         </div>
 
         <div class="field-group">
-          <label for="cot">Cotação atual</label>
-          <input id="cot" type="number" min="0" step="0.01" placeholder="0,00" required>
+          <label for="cot">Cotação atual (opcional)</label>
+          <input id="cot" type="number" min="0" step="0.01" placeholder="BRAPI ou valor manual">
         </div>
 
         <div class="field-group">

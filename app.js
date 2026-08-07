@@ -13,6 +13,8 @@ const moeda = document.getElementById("moeda");
 const ticker = document.getElementById("tic");
 const quantidade = document.getElementById("qtd");
 const precoMedio = document.getElementById("pm");
+const labelPrecoMedio = document.getElementById("labelPrecoMedio");
+const hintPrecoMedio = document.getElementById("hintPrecoMedio");
 const cotacao = document.getElementById("cot");
 const dividendYield = document.getElementById("dy");
 const dataCompra = document.getElementById("dataCompra");
@@ -140,10 +142,31 @@ function criarId() {
   return `ativo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function normalizarMovimentacao(movimentacao) {
+  if (!movimentacao || typeof movimentacao !== "object") return null;
+
+  const quantidadeMov = numeroSeguro(movimentacao.q ?? movimentacao.quantidade);
+  const precoMov = numeroSeguro(movimentacao.preco ?? movimentacao.p);
+
+  if (quantidadeMov <= 0 || precoMov < 0) return null;
+
+  return {
+    id: String(movimentacao.id || criarId()),
+    tipo: String(movimentacao.tipo || "compra"),
+    data: validarData(movimentacao.data || ""),
+    q: quantidadeMov,
+    preco: precoMov,
+    corretora: String(movimentacao.corretora || "").trim()
+  };
+}
+
 function normalizarAtivo(ativo) {
   const preco = numeroSeguro(ativo.p ?? ativo.precoMedio);
   const tipo = String(ativo.c ?? ativo.categoria ?? "FII");
   const cotacaoAtual = numeroSeguro(ativo.cot ?? ativo.cotacao, preco);
+  const movimentacoes = Array.isArray(ativo.movimentacoes)
+    ? ativo.movimentacoes.map(normalizarMovimentacao).filter(Boolean)
+    : [];
 
   return {
     id: String(ativo.id || criarId()),
@@ -156,8 +179,45 @@ function normalizarAtivo(ativo) {
     dy: numeroSeguro(ativo.dy ?? ativo.dividendYield),
     data: validarData(ativo.data ?? ativo.dataCompra ?? ""),
     corretora: String(ativo.corretora ?? "").trim(),
-    favorito: Boolean(ativo.favorito)
+    favorito: Boolean(ativo.favorito),
+    movimentacoes
   };
+}
+
+function consolidarAtivosDuplicados(lista) {
+  const consolidados = new Map();
+
+  lista.forEach((ativo) => {
+    if (!ativo.t) return;
+
+    const chave = `${ativo.t}::${ativo.m}`;
+    const existente = consolidados.get(chave);
+
+    if (!existente) {
+      consolidados.set(chave, { ...ativo, movimentacoes: [...(ativo.movimentacoes || [])] });
+      return;
+    }
+
+    const quantidadeAnterior = numeroSeguro(existente.q);
+    const quantidadeNova = numeroSeguro(ativo.q);
+    const quantidadeTotal = quantidadeAnterior + quantidadeNova;
+    const custoTotal = (quantidadeAnterior * numeroSeguro(existente.p)) +
+      (quantidadeNova * numeroSeguro(ativo.p));
+
+    existente.q = quantidadeTotal;
+    existente.p = quantidadeTotal > 0 ? custoTotal / quantidadeTotal : 0;
+    existente.cot = numeroSeguro(ativo.cot) > 0 ? numeroSeguro(ativo.cot) : existente.cot;
+    existente.dy = numeroSeguro(ativo.dy) > 0 ? numeroSeguro(ativo.dy) : existente.dy;
+    existente.data = ativo.data || existente.data;
+    existente.corretora = ativo.corretora || existente.corretora;
+    existente.favorito = existente.favorito || ativo.favorito;
+    existente.movimentacoes = [
+      ...(existente.movimentacoes || []),
+      ...(ativo.movimentacoes || [])
+    ];
+  });
+
+  return [...consolidados.values()];
 }
 
 function carregarAtivos() {
@@ -168,7 +228,9 @@ function carregarAtivos() {
       return [];
     }
 
-    return dados.map(normalizarAtivo).filter((ativo) => ativo.t);
+    return consolidarAtivosDuplicados(
+      dados.map(normalizarAtivo).filter((ativo) => ativo.t)
+    );
   } catch (erro) {
     console.error("Não foi possível carregar a carteira:", erro);
     return [];
@@ -903,8 +965,10 @@ function limparFormulario() {
   categoria.value = "FII";
   moeda.value = "BRL";
   ativoEmEdicaoId = null;
-  tituloModal.textContent = "Adicionar ativo";
-  subtituloModal.textContent = "Cadastre um novo investimento.";
+  tituloModal.textContent = "Adicionar compra";
+  subtituloModal.textContent = "Informe a compra. Se o ticker já existir, a posição será consolidada.";
+  if (labelPrecoMedio) labelPrecoMedio.textContent = "Preço da compra";
+  if (hintPrecoMedio) hintPrecoMedio.textContent = "O preço médio da posição será recalculado automaticamente.";
 }
 
 function abrirModalNovoAtivo() {
@@ -929,8 +993,10 @@ function abrirModalEdicao(id) {
   dataCompra.value = ativo.data;
   corretora.value = ativo.corretora;
   favorito.checked = ativo.favorito;
-  tituloModal.textContent = "Editar ativo";
-  subtituloModal.textContent = `Atualize os dados de ${ativo.t}.`;
+  tituloModal.textContent = "Editar posição";
+  subtituloModal.textContent = `Atualize os dados consolidados de ${ativo.t}.`;
+  if (labelPrecoMedio) labelPrecoMedio.textContent = "Preço médio atual";
+  if (hintPrecoMedio) hintPrecoMedio.textContent = "Na edição da posição, este campo altera diretamente o preço médio consolidado.";
   modal.showModal();
   ticker.focus();
 }
@@ -1668,14 +1734,18 @@ document.addEventListener("keydown", (evento) => {
 formAtivo.addEventListener("submit", (evento) => {
   evento.preventDefault();
 
-  const dadosAtivo = {
+  const tickerNormalizado = ticker.value.trim().toUpperCase();
+  const quantidadeInformada = numeroSeguro(quantidade.value);
+  const precoInformado = numeroSeguro(precoMedio.value);
+  const cotacaoInformada = numeroSeguro(cotacao.value);
+  const dadosBase = {
     id: ativoEmEdicaoId || criarId(),
-    t: ticker.value.trim().toUpperCase(),
+    t: tickerNormalizado,
     c: categoria.value,
     m: moeda.value,
-    q: numeroSeguro(quantidade.value),
-    p: numeroSeguro(precoMedio.value),
-    cot: numeroSeguro(cotacao.value),
+    q: quantidadeInformada,
+    p: precoInformado,
+    cot: cotacaoInformada,
     dy: numeroSeguro(dividendYield.value),
     data: validarData(dataCompra.value),
     corretora: corretora.value.trim(),
@@ -1683,29 +1753,76 @@ formAtivo.addEventListener("submit", (evento) => {
   };
 
   if (
-    !dadosAtivo.t ||
-    dadosAtivo.q <= 0 ||
-    dadosAtivo.p < 0 ||
-    dadosAtivo.cot < 0 ||
-    dadosAtivo.dy < 0
+    !dadosBase.t ||
+    dadosBase.q <= 0 ||
+    dadosBase.p < 0 ||
+    dadosBase.cot < 0 ||
+    dadosBase.dy < 0
   ) {
     alert("Preencha todos os campos obrigatórios com valores válidos.");
     return;
   }
 
+  let mensagem = "";
+
   if (ativoEmEdicaoId) {
     const indice = ativos.findIndex((ativo) => ativo.id === ativoEmEdicaoId);
 
     if (indice >= 0) {
-      ativos[indice] = dadosAtivo;
+      const atual = ativos[indice];
+      ativos[indice] = {
+        ...dadosBase,
+        cot: dadosBase.cot > 0 ? dadosBase.cot : atual.cot,
+        movimentacoes: [...(atual.movimentacoes || [])]
+      };
+      mensagem = `${dadosBase.t} foi atualizado.`;
     }
   } else {
-    ativos.push(dadosAtivo);
-  }
+    const existente = ativos.find(
+      (ativo) => ativo.t === dadosBase.t && ativo.m === dadosBase.m
+    );
 
-  const mensagem = ativoEmEdicaoId
-    ? `${dadosAtivo.t} foi atualizado.`
-    : `${dadosAtivo.t} foi adicionado à carteira.`;
+    const novaMovimentacao = {
+      id: criarId(),
+      tipo: "compra",
+      data: dadosBase.data,
+      q: dadosBase.q,
+      preco: dadosBase.p,
+      corretora: dadosBase.corretora
+    };
+
+    if (existente) {
+      const quantidadeAnterior = numeroSeguro(existente.q);
+      const custoAnterior = quantidadeAnterior * numeroSeguro(existente.p);
+      const custoNovaCompra = dadosBase.q * dadosBase.p;
+      const quantidadeTotal = quantidadeAnterior + dadosBase.q;
+
+      existente.q = quantidadeTotal;
+      existente.p = quantidadeTotal > 0
+        ? (custoAnterior + custoNovaCompra) / quantidadeTotal
+        : 0;
+      existente.cot = dadosBase.cot > 0 ? dadosBase.cot : existente.cot;
+      existente.dy = dadosBase.dy > 0 ? dadosBase.dy : existente.dy;
+      existente.data = dadosBase.data || existente.data;
+      existente.corretora = dadosBase.corretora || existente.corretora;
+      existente.favorito = existente.favorito || dadosBase.favorito;
+      existente.c = dadosBase.c || existente.c;
+      existente.movimentacoes = [
+        ...(existente.movimentacoes || []),
+        novaMovimentacao
+      ];
+
+      mensagem = `${dadosBase.t}: compra consolidada. Nova quantidade ${quantidadeTotal} e preço médio ${formatarMoeda(existente.p, existente.m)}.`;
+    } else {
+      const novoAtivo = {
+        ...dadosBase,
+        cot: dadosBase.cot > 0 ? dadosBase.cot : dadosBase.p,
+        movimentacoes: [novaMovimentacao]
+      };
+      ativos.push(novoAtivo);
+      mensagem = `${dadosBase.t} foi adicionado à carteira.`;
+    }
+  }
 
   modal.close();
   atualizar();
