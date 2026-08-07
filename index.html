@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.9.0</title>
+  <title>Planner Financeiro · v1.9.1</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.9.0 · Resumo por moeda</span>
+        <span>Versão 1.9.1 · Logos aprimorados e desempenho</span>
       </div>
     </aside>
 
@@ -73,38 +73,6 @@
         </article>
       </section>
 
-      <section class="currency-summary" aria-label="Resumo por moeda">
-        <article class="currency-card currency-card-brl">
-          <div class="currency-card-heading">
-            <span class="currency-badge">R$</span>
-            <div>
-              <strong>Carteira em Real</strong>
-              <small id="resumoBRLQuantidade">0 ativos</small>
-            </div>
-          </div>
-          <div class="currency-card-values">
-            <div><span>Investido</span><strong id="resumoBRLInvestido">R$ 0,00</strong></div>
-            <div><span>Mercado</span><strong id="resumoBRLMercado">R$ 0,00</strong></div>
-            <div><span>Resultado</span><strong id="resumoBRLResultado" class="neutral">R$ 0,00</strong></div>
-          </div>
-        </article>
-
-        <article class="currency-card currency-card-usd">
-          <div class="currency-card-heading">
-            <span class="currency-badge">US$</span>
-            <div>
-              <strong>Carteira em Dólar</strong>
-              <small id="resumoUSDQuantidade">0 ativos</small>
-            </div>
-          </div>
-          <div class="currency-card-values">
-            <div><span>Investido</span><strong id="resumoUSDInvestido">US$ 0,00</strong></div>
-            <div><span>Mercado</span><strong id="resumoUSDMercado">US$ 0,00</strong></div>
-            <div><span>Resultado</span><strong id="resumoUSDResultado" class="neutral">US$ 0,00</strong></div>
-          </div>
-        </article>
-      </section>
-
       <section class="dashboard-grid">
         <article class="panel allocation-panel">
           <div class="panel-header">
@@ -138,6 +106,14 @@
             <div class="indicator-row">
               <span>Favoritos</span>
               <strong id="indicadorFavoritos">0</strong>
+            </div>
+            <div class="indicator-row">
+              <span>Melhor desempenho</span>
+              <strong id="indicadorMelhorAtivo">—</strong>
+            </div>
+            <div class="indicator-row">
+              <span>Pior desempenho</span>
+              <strong id="indicadorPiorAtivo">—</strong>
             </div>
             <div class="indicator-row">
               <span>DY médio — Real</span>

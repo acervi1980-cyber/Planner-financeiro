@@ -44,17 +44,11 @@ const detalheInvestidoEl = document.getElementById("detalheInvestido");
 const alocacaoConteudo = document.getElementById("alocacaoConteudo");
 const indicadorQuantidade = document.getElementById("indicadorQuantidade");
 const indicadorFavoritos = document.getElementById("indicadorFavoritos");
+const indicadorMelhorAtivo = document.getElementById("indicadorMelhorAtivo");
+const indicadorPiorAtivo = document.getElementById("indicadorPiorAtivo");
 const indicadorDyBRL = document.getElementById("indicadorDyBRL");
 const indicadorDyUSD = document.getElementById("indicadorDyUSD");
 const indicadorRendimentos = document.getElementById("indicadorRendimentos");
-const resumoBRLQuantidade = document.getElementById("resumoBRLQuantidade");
-const resumoBRLInvestido = document.getElementById("resumoBRLInvestido");
-const resumoBRLMercado = document.getElementById("resumoBRLMercado");
-const resumoBRLResultado = document.getElementById("resumoBRLResultado");
-const resumoUSDQuantidade = document.getElementById("resumoUSDQuantidade");
-const resumoUSDInvestido = document.getElementById("resumoUSDInvestido");
-const resumoUSDMercado = document.getElementById("resumoUSDMercado");
-const resumoUSDResultado = document.getElementById("resumoUSDResultado");
 const btnTema = document.getElementById("btnTema");
 const iconeTema = document.getElementById("iconeTema");
 const textoTema = document.getElementById("textoTema");
@@ -303,6 +297,16 @@ function calcularTotais() {
 }
 
 
+const SIMPLE_ICON_SLUGS = {
+  AAPL: "apple", COST: "costco", FTNT: "fortinet", MSFT: "microsoft",
+  AMZN: "amazon", GOOGL: "google", GOOG: "google", META: "meta",
+  NVDA: "nvidia", TSLA: "tesla", KO: "cocacola", MCD: "mcdonalds",
+  DIS: "disney", WMT: "walmart", V: "visa", MA: "mastercard",
+  NFLX: "netflix", PYPL: "paypal", ADBE: "adobe", INTC: "intel",
+  AMD: "amd", ORCL: "oracle", CRM: "salesforce", QCOM: "qualcomm",
+  PETR3: "petrobras", PETR4: "petrobras"
+};
+
 const LOGO_DOMAINS = {
   AAPL: "apple.com",
   COST: "costco.com",
@@ -452,6 +456,13 @@ function obterFontesLogo(ativo) {
   }
 
   const fontes = [];
+
+  // Prioriza SVG vetorial para marcas conhecidas; se falhar, usa as fontes já existentes.
+  const simpleIconSlug = SIMPLE_ICON_SLUGS[chave];
+  if (simpleIconSlug) {
+    fontes.push(`https://cdn.simpleicons.org/${encodeURIComponent(simpleIconSlug)}`);
+  }
+
   const ehAcaoB3 = ativo?.m === "BRL" && (categoria === "Ação" || categoria === "BDR");
   const ehStockAmericana = ativo?.m === "USD" && categoria === "Stock";
 
@@ -733,32 +744,10 @@ function atualizar() {
   contadorAtivos.textContent = formatarContador(ativosVisiveis.length, ativos.length);
 
   atualizarIndicadores(totais, possuiBRL, possuiUSD);
-  atualizarResumoPorMoeda(totais);
   renderizarAlocacao();
 
   salvarLocalmente();
   atualizarRendaPassiva();
-}
-
-function atualizarResumoPorMoeda(totais) {
-  const quantidadeBRL = ativos.filter((ativo) => ativo.m === "BRL").length;
-  const quantidadeUSD = ativos.filter((ativo) => ativo.m === "USD").length;
-
-  if (resumoBRLQuantidade) resumoBRLQuantidade.textContent = `${quantidadeBRL} ${quantidadeBRL === 1 ? "ativo" : "ativos"}`;
-  if (resumoBRLInvestido) resumoBRLInvestido.textContent = formatarMoeda(totais.BRL.investido, "BRL");
-  if (resumoBRLMercado) resumoBRLMercado.textContent = formatarMoeda(totais.BRL.mercado, "BRL");
-  if (resumoBRLResultado) {
-    resumoBRLResultado.textContent = formatarMoeda(totais.BRL.lucro, "BRL");
-    resumoBRLResultado.className = classeResultado(totais.BRL.lucro);
-  }
-
-  if (resumoUSDQuantidade) resumoUSDQuantidade.textContent = `${quantidadeUSD} ${quantidadeUSD === 1 ? "ativo" : "ativos"}`;
-  if (resumoUSDInvestido) resumoUSDInvestido.textContent = formatarMoeda(totais.USD.investido, "USD");
-  if (resumoUSDMercado) resumoUSDMercado.textContent = formatarMoeda(totais.USD.mercado, "USD");
-  if (resumoUSDResultado) {
-    resumoUSDResultado.textContent = formatarMoeda(totais.USD.lucro, "USD");
-    resumoUSDResultado.className = classeResultado(totais.USD.lucro);
-  }
 }
 
 function formatarResumo(valorBRL, valorUSD, possuiBRL, possuiUSD) {
@@ -798,6 +787,28 @@ function formatarContador(visiveis, total) {
 function atualizarIndicadores(totais, possuiBRL, possuiUSD) {
   indicadorQuantidade.textContent = ativos.length.toLocaleString("pt-BR");
   indicadorFavoritos.textContent = ativos.filter((ativo) => ativo.favorito).length.toLocaleString("pt-BR");
+
+  const desempenhos = ativos
+    .filter((ativo) => numeroSeguro(ativo.p) > 0)
+    .map((ativo) => ({
+      ticker: ativo.t,
+      percentual: ((numeroSeguro(ativo.cot) - numeroSeguro(ativo.p)) / numeroSeguro(ativo.p)) * 100
+    }))
+    .filter((item) => Number.isFinite(item.percentual));
+
+  if (desempenhos.length) {
+    const melhor = desempenhos.reduce((a, b) => b.percentual > a.percentual ? b : a);
+    const pior = desempenhos.reduce((a, b) => b.percentual < a.percentual ? b : a);
+    indicadorMelhorAtivo.textContent = `${melhor.ticker} · ${formatarPercentual(melhor.percentual)}`;
+    indicadorMelhorAtivo.className = melhor.percentual > 0 ? "positive" : melhor.percentual < 0 ? "negative" : "neutral";
+    indicadorPiorAtivo.textContent = `${pior.ticker} · ${formatarPercentual(pior.percentual)}`;
+    indicadorPiorAtivo.className = pior.percentual > 0 ? "positive" : pior.percentual < 0 ? "negative" : "neutral";
+  } else {
+    indicadorMelhorAtivo.textContent = "—";
+    indicadorMelhorAtivo.className = "neutral";
+    indicadorPiorAtivo.textContent = "—";
+    indicadorPiorAtivo.className = "neutral";
+  }
   indicadorDyBRL.textContent = formatarPercentual(totais.BRL.dyMedio);
   indicadorDyUSD.textContent = formatarPercentual(totais.USD.dyMedio);
   indicadorRendimentos.textContent = formatarResumo(
