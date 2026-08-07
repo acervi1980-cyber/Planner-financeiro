@@ -298,6 +298,7 @@ function calcularTotais() {
 const LOGO_DOMAINS = {
   AAPL: "apple.com",
   COST: "costco.com",
+  FTNT: "fortinet.com",
   MSFT: "microsoft.com",
   AMZN: "amazon.com",
   GOOGL: "google.com",
@@ -429,28 +430,25 @@ function obterFontesLogo(ativo) {
   const chave = normalizarTickerParaChave(ativo?.t);
   if (!chave) return [];
 
-  // FIIs usam sempre o ícone padrão de prédio para manter a carteira uniforme.
-  if (ativo?.c === "FII" || ativo?.c === "Renda Fixa") return [];
+  const tipoLogo = tipoLogoAtivo(ativo);
+
+  // FIIs e ETFs permanecem com ícones próprios e consistentes.
+  // Isso evita mostrar o logotipo da gestora como se fosse o logotipo do fundo.
+  if (tipoLogo === "fii" || tipoLogo === "etf") {
+    return [];
+  }
 
   const fontes = [];
   const ehAtivoB3 = ativo?.m === "BRL" && ativo?.c !== "Renda Fixa";
-  const ehAtivoAmericano =
-    ativo?.m === "USD" &&
-    (ativo?.c === "Stock" || ativo?.c === "ETF Internacional");
-
-  // A brapi disponibiliza os logotipos da B3 diretamente pelo ticker.
-  // Assim, novas ações e BDRs não precisam ser incluídos manualmente no código.
-  if (ehAtivoB3) {
-    fontes.push(`https://icons.brapi.dev/icons/${encodeURIComponent(chave)}.svg`);
-  }
-
-  // Fonte automática por ticker para ações e ETFs dos Estados Unidos.
-  // Caso a imagem não exista, o carregamento segue para as fontes por domínio.
-  if (ehAtivoAmericano) {
-    fontes.push(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(chave)}.png`);
-  }
-
   const dominio = LOGO_DOMAINS[chave];
+
+  if (ehAtivoB3) {
+    fontes.push(
+      `https://icons.brapi.dev/icons/${encodeURIComponent(chave)}.svg`,
+      `https://icons.brapi.dev/icons/${encodeURIComponent(chave)}.png`
+    );
+  }
+
   if (dominio) {
     const host = String(dominio)
       .trim()
@@ -459,7 +457,8 @@ function obterFontesLogo(ativo) {
       .toLowerCase();
 
     fontes.push(
-      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
+      `https://logo.clearbit.com/${encodeURIComponent(host)}?size=256`,
+      `https://www.google.com/s2/favicons?domain_url=https://${encodeURIComponent(host)}&sz=256`,
       `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`
     );
   }
@@ -544,11 +543,10 @@ function criarLogoHtml(ativo, classeExtra = "") {
         ${fallback}
         <img
           src="${fontes[0]}"
-          alt="Logotipo de ${escaparHtml(ativo.t)}"
-          width="128"
-          height="128"
-          loading="lazy"
+          alt=""
+          loading="eager"
           decoding="async"
+          fetchpriority="low"
           referrerpolicy="no-referrer"
           data-fontes-logo="${fontesSerializadas}"
           data-indice-logo="0"
