@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.9.2</title>
+  <title>Planner Financeiro · v1.9.3</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.9.2 · Resumo limpo e logotipos</span>
+        <span>Versão 1.9.3 · Cotações BRAPI</span>
       </div>
     </aside>
 
@@ -150,6 +150,7 @@
 
           <div class="data-actions">
             <button type="button" class="quote-update-button compact-button" id="btnAtualizarCotacoes">↻ Atualizar cotações</button>
+            <button type="button" class="secondary compact-button" id="btnConfigurarBrapi" title="Configurar token da BRAPI">⚙ BRAPI</button>
             <button type="button" class="secondary compact-button" id="btnExportar">Exportar backup</button>
             <button type="button" class="secondary compact-button" id="btnImportar">Importar backup</button>
             <input type="file" id="arquivoImportacao" accept=".json,application/json" hidden>
@@ -160,7 +161,7 @@
           <div class="quotes-status-icon" id="quotesStatusIcon" aria-hidden="true">◷</div>
           <div class="quotes-status-copy">
             <strong id="quotesStatusTitle">Cotações prontas para conferência</strong>
-            <span id="quotesStatusText">Os preços cadastrados permanecem preservados até a conexão com uma API de mercado.</span>
+            <span id="quotesStatusText">Atualiza ações, FIIs, ETFs e BDRs da B3 pela BRAPI. Ativos em dólar permanecem inalterados nesta etapa.</span>
           </div>
           <span class="quotes-status-time" id="quotesStatusTime">Nunca verificado</span>
         </div>

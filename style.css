@@ -1826,3 +1826,14 @@ html[data-theme="dark"] .asset-logo.has-image {
     flex: 1;
   }
 }
+
+
+/* ===== Planner v1.9.3 — Cotações BRAPI ===== */
+.quotes-status-panel.is-error {
+  border-color: color-mix(in srgb, var(--loss) 38%, var(--line));
+  background: color-mix(in srgb, var(--loss-soft) 64%, var(--card));
+}
+
+.quotes-status-panel.is-error .quotes-status-icon {
+  color: var(--loss);
+}

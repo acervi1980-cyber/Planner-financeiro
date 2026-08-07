@@ -35,7 +35,10 @@ const quotesStatusIcon = document.getElementById("quotesStatusIcon");
 const quotesStatusTitle = document.getElementById("quotesStatusTitle");
 const quotesStatusText = document.getElementById("quotesStatusText");
 const quotesStatusTime = document.getElementById("quotesStatusTime");
+const btnConfigurarBrapi = document.getElementById("btnConfigurarBrapi");
 const QUOTES_STATUS_KEY = "planner-quotes-status";
+const BRAPI_TOKEN_KEY = "planner-brapi-token";
+const BRAPI_FREE_TICKERS = new Set(["PETR4", "MGLU3", "VALE3", "ITUB4"]);
 
 const valorInvestidoEl = document.getElementById("valorInvestido");
 const valorMercadoEl = document.getElementById("valorMercado");
@@ -1328,6 +1331,94 @@ function formatarDataHoraCotacoes(dataIso) {
   }).format(data);
 }
 
+function obterTokenBrapi() {
+  try {
+    return (localStorage.getItem(BRAPI_TOKEN_KEY) || "").trim();
+  } catch (erro) {
+    console.warn("Não foi possível ler o token da BRAPI.", erro);
+    return "";
+  }
+}
+
+function configurarBrapi() {
+  const tokenAtual = obterTokenBrapi();
+  const resposta = window.prompt(
+    "Cole seu token da BRAPI. Ele ficará salvo somente neste navegador e não será enviado ao GitHub.\n\nDeixe em branco e confirme para remover o token.",
+    tokenAtual
+  );
+
+  if (resposta === null) return;
+
+  const token = resposta.trim();
+
+  try {
+    if (token) {
+      localStorage.setItem(BRAPI_TOKEN_KEY, token);
+      quotesStatusPanel.classList.remove("is-error");
+      quotesStatusPanel.classList.add("is-success");
+      quotesStatusIcon.textContent = "✓";
+      quotesStatusTitle.textContent = "BRAPI configurada";
+      quotesStatusText.textContent = "Token salvo apenas neste navegador. Agora você pode atualizar as cotações da B3.";
+      mostrarToast("Token da BRAPI salvo neste navegador.");
+    } else {
+      localStorage.removeItem(BRAPI_TOKEN_KEY);
+      quotesStatusPanel.classList.remove("is-success", "is-error");
+      quotesStatusIcon.textContent = "◷";
+      quotesStatusTitle.textContent = "BRAPI sem token";
+      quotesStatusText.textContent = "Sem token, somente os tickers gratuitos de teste da BRAPI podem ser consultados.";
+      mostrarToast("Token da BRAPI removido.");
+    }
+  } catch (erro) {
+    console.error("Não foi possível salvar o token da BRAPI.", erro);
+    mostrarToast("Não foi possível salvar o token da BRAPI.", true);
+  }
+}
+
+function tickerConsultaBrapi(ativo) {
+  const tickerBase = String(ativo.t || "").trim().toUpperCase().replace(/\s+/g, "");
+
+  // Alguns cadastros antigos de FII foram salvos sem o sufixo 11 (ex.: VRTA).
+  // Para a consulta na B3 tentamos o formato padrão, sem alterar o ticker exibido ao usuário.
+  if (ativo.c === "FII" && /^[A-Z]{4}$/.test(tickerBase)) {
+    return `${tickerBase}11`;
+  }
+
+  return tickerBase;
+}
+
+function ativosElegiveisBrapi() {
+  const categoriasB3 = new Set(["Ação", "FII", "ETF Brasil", "BDR"]);
+  return ativos.filter((ativo) => ativo.m === "BRL" && categoriasB3.has(ativo.c) && ativo.t);
+}
+
+async function buscarLoteBrapi(tickers, token) {
+  const url = `https://brapi.dev/api/quote/${tickers.map(encodeURIComponent).join(",")}`;
+  const headers = { Accept: "application/json" };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const resposta = await fetch(url, { headers, cache: "no-store" });
+
+  if (!resposta.ok) {
+    let detalhe = "";
+    try {
+      const corpo = await resposta.json();
+      detalhe = corpo?.message || corpo?.error || "";
+    } catch (_) {
+      // resposta sem JSON; mantemos apenas o status HTTP
+    }
+
+    const erro = new Error(detalhe || `BRAPI respondeu HTTP ${resposta.status}.`);
+    erro.status = resposta.status;
+    throw erro;
+  }
+
+  const dados = await resposta.json();
+  return Array.isArray(dados?.results) ? dados.results : [];
+}
+
 function carregarStatusCotacoes() {
   let ultimaVerificacao = "";
 
@@ -1342,45 +1433,121 @@ function carregarStatusCotacoes() {
   if (ultimaVerificacao) {
     quotesStatusPanel.classList.add("is-success");
     quotesStatusIcon.textContent = "✓";
-    quotesStatusTitle.textContent = "Carteira conferida";
-    quotesStatusText.textContent = "Estrutura validada. As cotações cadastradas foram mantidas sem alteração.";
+    quotesStatusTitle.textContent = "Cotações da B3 atualizadas";
+    quotesStatusText.textContent = "A última consulta pela BRAPI foi concluída. Ativos em dólar permanecem manuais nesta etapa.";
+  } else if (obterTokenBrapi()) {
+    quotesStatusTitle.textContent = "BRAPI pronta";
+    quotesStatusText.textContent = "Token configurado. Clique em Atualizar cotações para consultar os ativos da B3.";
   }
 }
 
-function atualizarCotacoes() {
+async function atualizarCotacoes() {
   if (!btnAtualizarCotacoes || btnAtualizarCotacoes.disabled) return;
+
+  const ativosB3 = ativosElegiveisBrapi();
+  const token = obterTokenBrapi();
+
+  if (!ativosB3.length) {
+    quotesStatusPanel.classList.remove("is-success", "is-loading", "is-error");
+    quotesStatusIcon.textContent = "i";
+    quotesStatusTitle.textContent = "Nenhum ativo da B3 para atualizar";
+    quotesStatusText.textContent = "Nesta etapa a BRAPI atualiza apenas Ações, FIIs, ETFs Brasil e BDRs cadastrados em Real.";
+    mostrarToast("Nenhum ativo da B3 encontrado na carteira.");
+    return;
+  }
+
+  const tickersConsulta = [...new Set(ativosB3.map(tickerConsultaBrapi).filter(Boolean))];
+  const precisaToken = tickersConsulta.some((ticker) => !BRAPI_FREE_TICKERS.has(ticker));
+
+  if (precisaToken && !token) {
+    quotesStatusPanel.classList.remove("is-success", "is-loading");
+    quotesStatusPanel.classList.add("is-error");
+    quotesStatusIcon.textContent = "!";
+    quotesStatusTitle.textContent = "Configure o token da BRAPI";
+    quotesStatusText.textContent = "Clique em ⚙ BRAPI e cole seu token. Ele será guardado somente neste navegador.";
+    quotesStatusTime.textContent = "Aguardando configuração";
+    mostrarToast("Configure o token da BRAPI antes de atualizar.", true);
+    return;
+  }
 
   btnAtualizarCotacoes.disabled = true;
   btnAtualizarCotacoes.classList.add("is-loading");
-  btnAtualizarCotacoes.textContent = "Verificando...";
-  quotesStatusPanel.classList.remove("is-success");
+  btnAtualizarCotacoes.textContent = "Atualizando B3...";
+  quotesStatusPanel.classList.remove("is-success", "is-error");
   quotesStatusPanel.classList.add("is-loading");
   quotesStatusIcon.textContent = "↻";
-  quotesStatusTitle.textContent = "Verificando a estrutura de cotações";
-  quotesStatusText.textContent = "Conferindo tickers, moedas e preços cadastrados na carteira...";
+  quotesStatusTitle.textContent = "Consultando a BRAPI";
+  quotesStatusText.textContent = `Buscando ${tickersConsulta.length} ${tickersConsulta.length === 1 ? "cotação" : "cotações"} da B3...`;
   quotesStatusTime.textContent = "Em andamento";
 
-  window.setTimeout(() => {
-    const ativosValidos = ativos.filter((ativo) => ativo.t && ativo.m && Number.isFinite(Number(ativo.cot)));
-    const agora = new Date().toISOString();
+  try {
+    const resultados = [];
+    const TAMANHO_LOTE = 20;
 
-    try {
-      localStorage.setItem(QUOTES_STATUS_KEY, agora);
-    } catch (erro) {
-      console.warn("Não foi possível salvar o status das cotações.", erro);
+    for (let i = 0; i < tickersConsulta.length; i += TAMANHO_LOTE) {
+      const lote = tickersConsulta.slice(i, i + TAMANHO_LOTE);
+      const respostaLote = await buscarLoteBrapi(lote, token);
+      resultados.push(...respostaLote);
     }
 
-    quotesStatusPanel.classList.remove("is-loading");
+    const precos = new Map();
+
+    resultados.forEach((resultado) => {
+      const simbolo = String(resultado?.symbol || resultado?.stock || "").trim().toUpperCase();
+      const preco = numeroSeguro(resultado?.regularMarketPrice, NaN);
+      if (simbolo && Number.isFinite(preco) && preco > 0) {
+        precos.set(simbolo, preco);
+      }
+    });
+
+    let atualizados = 0;
+    const naoEncontrados = [];
+
+    ativosB3.forEach((ativo) => {
+      const tickerBrapi = tickerConsultaBrapi(ativo);
+      const novoPreco = precos.get(tickerBrapi);
+
+      if (Number.isFinite(novoPreco) && novoPreco > 0) {
+        ativo.cot = novoPreco;
+        atualizados += 1;
+      } else {
+        naoEncontrados.push(ativo.t);
+      }
+    });
+
+    const agora = new Date().toISOString();
+    localStorage.setItem(QUOTES_STATUS_KEY, agora);
+    atualizar();
+
+    quotesStatusPanel.classList.remove("is-loading", "is-error");
     quotesStatusPanel.classList.add("is-success");
     quotesStatusIcon.textContent = "✓";
-    quotesStatusTitle.textContent = `${ativosValidos.length} ${ativosValidos.length === 1 ? "ativo conferido" : "ativos conferidos"}`;
-    quotesStatusText.textContent = "Módulo v1.5 ativo. Nenhum preço foi alterado; a conexão com a API será feita na próxima etapa.";
+    quotesStatusTitle.textContent = `${atualizados} ${atualizados === 1 ? "cotação atualizada" : "cotações atualizadas"} pela BRAPI`;
+    quotesStatusText.textContent = naoEncontrados.length
+      ? `Sem cotação para: ${naoEncontrados.join(", ")}. Os preços anteriores desses ativos foram preservados.`
+      : "Ações, FIIs, ETFs Brasil e BDRs em Real foram atualizados. Ativos em dólar permanecem inalterados nesta etapa.";
     quotesStatusTime.textContent = formatarDataHoraCotacoes(agora);
+    mostrarToast(`${atualizados} ${atualizados === 1 ? "cotação atualizada" : "cotações atualizadas"} pela BRAPI.`);
+  } catch (erro) {
+    console.error("Falha ao atualizar cotações pela BRAPI:", erro);
+    quotesStatusPanel.classList.remove("is-loading", "is-success");
+    quotesStatusPanel.classList.add("is-error");
+    quotesStatusIcon.textContent = "!";
+    quotesStatusTitle.textContent = "Não foi possível atualizar pela BRAPI";
+
+    if (erro?.status === 401 || erro?.status === 403) {
+      quotesStatusText.textContent = "O token da BRAPI foi recusado. Clique em ⚙ BRAPI para conferir ou substituir o token.";
+    } else {
+      quotesStatusText.textContent = "As cotações anteriores foram preservadas. Confira sua conexão e tente novamente.";
+    }
+
+    quotesStatusTime.textContent = "Falha na atualização";
+    mostrarToast("Falha ao consultar a BRAPI. Nenhuma cotação foi zerada.", true);
+  } finally {
     btnAtualizarCotacoes.disabled = false;
     btnAtualizarCotacoes.classList.remove("is-loading");
     btnAtualizarCotacoes.textContent = "↻ Atualizar cotações";
-    mostrarToast("Central de cotações verificada com sucesso.");
-  }, 900);
+  }
 }
 
 document.getElementById("btnAdicionar").addEventListener("click", abrirModalNovoAtivo);
@@ -1390,6 +1557,7 @@ document.getElementById("btnCancelarExclusao").addEventListener("click", fecharM
 document.getElementById("btnExportar").addEventListener("click", exportarBackup);
 document.getElementById("btnImportar").addEventListener("click", () => arquivoImportacao.click());
 btnAtualizarCotacoes.addEventListener("click", atualizarCotacoes);
+btnConfigurarBrapi?.addEventListener("click", configurarBrapi);
 document.getElementById("btnConfirmarImportacao").addEventListener("click", confirmarImportacao);
 document.getElementById("btnCancelarImportacao").addEventListener("click", cancelarImportacao);
 
