@@ -430,25 +430,35 @@ function obterFontesLogo(ativo) {
   const chave = normalizarTickerParaChave(ativo?.t);
   if (!chave) return [];
 
-  const tipoLogo = tipoLogoAtivo(ativo);
+  const categoria = String(ativo?.c || "").trim();
 
-  // FIIs e ETFs permanecem com ícones próprios e consistentes.
-  // Isso evita mostrar o logotipo da gestora como se fosse o logotipo do fundo.
-  if (tipoLogo === "fii" || tipoLogo === "etf") {
+  // FIIs e ETFs usam ícones próprios e consistentes. Isso evita que apareça
+  // o favicon da gestora no lugar da identidade visual do tipo de ativo.
+  if (
+    categoria === "FII" ||
+    categoria === "ETF Brasil" ||
+    categoria === "ETF Internacional" ||
+    categoria === "Renda Fixa"
+  ) {
     return [];
   }
 
   const fontes = [];
-  const ehAtivoB3 = ativo?.m === "BRL" && ativo?.c !== "Renda Fixa";
-  const dominio = LOGO_DOMAINS[chave];
+  const ehAcaoB3 = ativo?.m === "BRL" && (categoria === "Ação" || categoria === "BDR");
+  const ehStockAmericana = ativo?.m === "USD" && categoria === "Stock";
 
-  if (ehAtivoB3) {
-    fontes.push(
-      `https://icons.brapi.dev/icons/${encodeURIComponent(chave)}.svg`,
-      `https://icons.brapi.dev/icons/${encodeURIComponent(chave)}.png`
-    );
+  // Logotipos automáticos de ações e BDRs negociados na B3.
+  if (ehAcaoB3) {
+    fontes.push(`https://icons.brapi.dev/icons/${encodeURIComponent(chave)}.svg`);
   }
 
+  // Logotipos automáticos de stocks negociadas nos Estados Unidos.
+  if (ehStockAmericana) {
+    fontes.push(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(chave)}.png`);
+  }
+
+  // Fontes alternativas por domínio para os tickers conhecidos.
+  const dominio = LOGO_DOMAINS[chave];
   if (dominio) {
     const host = String(dominio)
       .trim()
@@ -457,8 +467,7 @@ function obterFontesLogo(ativo) {
       .toLowerCase();
 
     fontes.push(
-      `https://logo.clearbit.com/${encodeURIComponent(host)}?size=256`,
-      `https://www.google.com/s2/favicons?domain_url=https://${encodeURIComponent(host)}&sz=256`,
+      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=256`,
       `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`
     );
   }
@@ -544,9 +553,8 @@ function criarLogoHtml(ativo, classeExtra = "") {
         <img
           src="${fontes[0]}"
           alt=""
-          loading="eager"
+          loading="lazy"
           decoding="async"
-          fetchpriority="low"
           referrerpolicy="no-referrer"
           data-fontes-logo="${fontesSerializadas}"
           data-indice-logo="0"
