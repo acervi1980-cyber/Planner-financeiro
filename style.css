@@ -1847,3 +1847,7 @@ html[data-theme="dark"] .asset-logo.has-image {
   font-size: 11px;
   line-height: 1.35;
 }
+
+
+/* ===== Planner v1.9.5 — Atualização automática BRAPI ===== */
+.quotes-status-time { font-variant-numeric: tabular-nums; }

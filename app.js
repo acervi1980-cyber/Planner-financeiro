@@ -41,6 +41,10 @@ const btnConfigurarBrapi = document.getElementById("btnConfigurarBrapi");
 const QUOTES_STATUS_KEY = "planner-quotes-status";
 const BRAPI_TOKEN_KEY = "planner-brapi-token";
 const BRAPI_FREE_TICKERS = new Set(["PETR4", "MGLU3", "VALE3", "ITUB4"]);
+const BRAPI_AUTO_INTERVAL_MS = 15 * 60 * 1000;
+const BRAPI_AUTO_FRESHNESS_MS = 5 * 60 * 1000;
+let atualizacaoAutomaticaEmAndamento = false;
+
 
 const valorInvestidoEl = document.getElementById("valorInvestido");
 const valorMercadoEl = document.getElementById("valorMercado");
@@ -1616,6 +1620,63 @@ async function atualizarCotacoes() {
   }
 }
 
+
+function ultimaCotacaoAindaRecente() {
+  try {
+    const ultima = localStorage.getItem(QUOTES_STATUS_KEY);
+    if (!ultima) return false;
+    const tempo = new Date(ultima).getTime();
+    return Number.isFinite(tempo) && (Date.now() - tempo) < BRAPI_AUTO_FRESHNESS_MS;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function atualizarCotacoesAutomaticamente({ forcar = false } = {}) {
+  if (atualizacaoAutomaticaEmAndamento || document.hidden) return;
+
+  const ativosB3 = ativosElegiveisBrapi();
+  if (!ativosB3.length) return;
+
+  const token = obterTokenBrapi();
+  const tickers = [...new Set(ativosB3.map(tickerConsultaBrapi).filter(Boolean))];
+  const precisaToken = tickers.some((ticker) => !BRAPI_FREE_TICKERS.has(ticker));
+
+  // Sem token, não interrompe a navegação com erro automático.
+  // O botão manual e o botão de configuração continuam disponíveis.
+  if (precisaToken && !token) {
+    quotesStatusPanel.classList.remove("is-loading", "is-success");
+    quotesStatusPanel.classList.add("is-error");
+    quotesStatusIcon.textContent = "!";
+    quotesStatusTitle.textContent = "Atualização automática aguardando BRAPI";
+    quotesStatusText.textContent = "Configure o token uma única vez em ⚙ BRAPI. Depois, o Planner atualizará a B3 automaticamente ao abrir.";
+    quotesStatusTime.textContent = "Token necessário";
+    return;
+  }
+
+  if (!forcar && ultimaCotacaoAindaRecente()) return;
+
+  atualizacaoAutomaticaEmAndamento = true;
+  try {
+    await atualizarCotacoes();
+  } finally {
+    atualizacaoAutomaticaEmAndamento = false;
+  }
+}
+
+function iniciarAtualizacaoAutomaticaBrapi() {
+  // Executa logo após a interface carregar.
+  window.setTimeout(() => atualizarCotacoesAutomaticamente(), 500);
+
+  // Enquanto o Planner permanecer aberto, verifica novamente a cada 15 minutos.
+  window.setInterval(() => atualizarCotacoesAutomaticamente({ forcar: true }), BRAPI_AUTO_INTERVAL_MS);
+
+  // Ao voltar para uma aba que ficou em segundo plano, verifica se os preços ficaram antigos.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) atualizarCotacoesAutomaticamente();
+  });
+}
+
 document.getElementById("btnAdicionar").addEventListener("click", abrirModalNovoAtivo);
 document.getElementById("btnCancelar").addEventListener("click", fecharModalCadastro);
 document.getElementById("btnFecharModal").addEventListener("click", fecharModalCadastro);
@@ -1851,3 +1912,4 @@ inicializarTema();
 carregarStatusCotacoes();
 atualizar();
 abrirView(location.hash === "#renda-passiva" ? "renda-passiva" : "dashboard");
+iniciarAtualizacaoAutomaticaBrapi();
