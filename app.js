@@ -1,8 +1,9 @@
 const STORAGE_KEY = "planner";
 const THEME_KEY = "planner-theme";
-const BACKUP_VERSION = 3;
+const BACKUP_VERSION = 4;
 const PASSIVE_SETTINGS_KEY = "planner-passive-settings";
 const SUMMARY_CURRENCY_KEY = "planner-summary-currency";
+const MOVEMENT_CURRENCY_KEY = "planner-movement-currency";
 
 const modal = document.getElementById("modal");
 const modalExcluir = document.getElementById("modalExcluir");
@@ -115,7 +116,36 @@ const rendaHeroTexto = document.getElementById("rendaHeroTexto");
 const rendaHeroMeta = document.getElementById("rendaHeroMeta");
 const rendaHeroBarra = document.getElementById("rendaHeroBarra");
 
-
+const viewMovimentacoes = document.getElementById("viewMovimentacoes");
+const btnNovaMovimentacao = document.getElementById("btnNovaMovimentacao");
+const modalMovimentacao = document.getElementById("modalMovimentacao");
+const formMovimentacao = document.getElementById("formMovimentacao");
+const movAtivo = document.getElementById("movAtivo");
+const movTipo = document.getElementById("movTipo");
+const movData = document.getElementById("movData");
+const movQuantidade = document.getElementById("movQuantidade");
+const movQuantidadeGrupo = document.getElementById("movQuantidadeGrupo");
+const movPreco = document.getElementById("movPreco");
+const movPrecoLabel = document.getElementById("movPrecoLabel");
+const movCorretora = document.getElementById("movCorretora");
+const movObservacao = document.getElementById("movObservacao");
+const movPreview = document.getElementById("movPreview");
+const tabelaMovimentacoes = document.getElementById("tabelaMovimentacoes");
+const movimentacoesVazias = document.getElementById("movimentacoesVazias");
+const contadorMovimentacoes = document.getElementById("contadorMovimentacoes");
+const buscaMovimentacao = document.getElementById("buscaMovimentacao");
+const filtroTipoMovimentacao = document.getElementById("filtroTipoMovimentacao");
+const movementCurrencyButtons = document.querySelectorAll("[data-movement-currency]");
+const movTotalRegistros = document.getElementById("movTotalRegistros");
+const movTotalCompras = document.getElementById("movTotalCompras");
+const movTotalVendas = document.getElementById("movTotalVendas");
+const movTotalRendimentos = document.getElementById("movTotalRendimentos");
+const movComprasDetalhe = document.getElementById("movComprasDetalhe");
+const movVendasDetalhe = document.getElementById("movVendasDetalhe");
+const movRendimentosDetalhe = document.getElementById("movRendimentosDetalhe");
+const drawerHistorico = document.getElementById("drawerHistorico");
+const drawerHistoricoResumo = document.getElementById("drawerHistoricoResumo");
+const btnDrawerMovimentacao = document.getElementById("btnDrawerMovimentacao");
 
 const CORES_CATEGORIAS = [
   "#134e3a",
@@ -137,6 +167,7 @@ let toastTimeout = null;
 let passiveSettings = carregarConfiguracoesRenda();
 let ativoNoDrawerId = null;
 let moedaResumo = localStorage.getItem(SUMMARY_CURRENCY_KEY) === "USD" ? "USD" : "BRL";
+let moedaMovimentacoes = localStorage.getItem(MOVEMENT_CURRENCY_KEY) === "USD" ? "USD" : "BRL";
 
 function criarId() {
   if (window.crypto?.randomUUID) {
@@ -149,18 +180,23 @@ function criarId() {
 function normalizarMovimentacao(movimentacao) {
   if (!movimentacao || typeof movimentacao !== "object") return null;
 
-  const quantidadeMov = numeroSeguro(movimentacao.q ?? movimentacao.quantidade);
-  const precoMov = numeroSeguro(movimentacao.preco ?? movimentacao.p);
+  const tipo = ["compra", "venda", "rendimento"].includes(String(movimentacao.tipo))
+    ? String(movimentacao.tipo)
+    : "compra";
+  const quantidadeMov = Math.max(0, numeroSeguro(movimentacao.q ?? movimentacao.quantidade));
+  const precoMov = Math.max(0, numeroSeguro(movimentacao.preco ?? movimentacao.p ?? movimentacao.valor));
 
-  if (quantidadeMov <= 0 || precoMov < 0) return null;
+  if ((tipo === "compra" || tipo === "venda") && quantidadeMov <= 0) return null;
+  if (tipo === "rendimento" && precoMov <= 0) return null;
 
   return {
     id: String(movimentacao.id || criarId()),
-    tipo: String(movimentacao.tipo || "compra"),
+    tipo,
     data: validarData(movimentacao.data || ""),
-    q: quantidadeMov,
+    q: tipo === "rendimento" ? 0 : quantidadeMov,
     preco: precoMov,
-    corretora: String(movimentacao.corretora || "").trim()
+    corretora: String(movimentacao.corretora || "").trim(),
+    observacao: String(movimentacao.observacao || "").trim()
   };
 }
 
@@ -703,6 +739,7 @@ function abrirDrawerAtivo(id) {
     `Equivale a ${formatarPercentual(yocMensal)} ao mês sobre o valor investido.`;
   drawerRendaMensal.textContent = formatarMoeda(rendaMensal, ativo.m);
   drawerRendaAnual.textContent = formatarMoeda(rendaAnual, ativo.m);
+  renderizarHistoricoDrawer(ativo);
 
   assetDrawerBackdrop.hidden = false;
   assetDrawer.classList.add("open");
@@ -804,6 +841,7 @@ function atualizar() {
 
   salvarLocalmente();
   atualizarRendaPassiva();
+  atualizarMovimentacoes();
 }
 
 function formatarResumo(valorBRL, valorUSD, possuiBRL, possuiUSD) {
@@ -1364,27 +1402,224 @@ function renderizarTabelaRendaAtivos() {
   }).join("");
 }
 
+function rotuloTipoMovimentacao(tipo) {
+  if (tipo === "venda") return "Venda";
+  if (tipo === "rendimento") return "Rendimento";
+  return "Compra";
+}
+
+function classeTipoMovimentacao(tipo) {
+  if (tipo === "venda") return "movement-type-sale";
+  if (tipo === "rendimento") return "movement-type-income";
+  return "movement-type-buy";
+}
+
+function obterMovimentacoesConsolidadas() {
+  return ativos.flatMap((ativo) => (ativo.movimentacoes || []).map((movimentacao) => ({
+    ...movimentacao,
+    ativoId: ativo.id,
+    ticker: ativo.t,
+    moeda: ativo.m,
+    categoria: ativo.c
+  })));
+}
+
+function totalMovimentacao(movimentacao) {
+  return movimentacao.tipo === "rendimento"
+    ? numeroSeguro(movimentacao.preco)
+    : numeroSeguro(movimentacao.q) * numeroSeguro(movimentacao.preco);
+}
+
+function renderizarHistoricoDrawer(ativo) {
+  const lista = [...(ativo.movimentacoes || [])]
+    .sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")))
+    .slice(0, 5);
+
+  drawerHistoricoResumo.textContent = ativo.movimentacoes?.length
+    ? `${ativo.movimentacoes.length} ${ativo.movimentacoes.length === 1 ? "movimentação" : "movimentações"}`
+    : "Nenhuma movimentação registrada";
+
+  if (!lista.length) {
+    drawerHistorico.innerHTML = '<div class="drawer-history-empty">O histórico aparecerá aqui.</div>';
+    return;
+  }
+
+  drawerHistorico.innerHTML = lista.map((mov) => {
+    const total = totalMovimentacao(mov);
+    const detalhe = mov.tipo === "rendimento"
+      ? formatarMoeda(total, ativo.m)
+      : `${numeroSeguro(mov.q).toLocaleString("pt-BR")} × ${formatarMoeda(mov.preco, ativo.m)}`;
+    return `
+      <div class="drawer-history-row">
+        <span class="movement-type ${classeTipoMovimentacao(mov.tipo)}">${rotuloTipoMovimentacao(mov.tipo)}</span>
+        <div><strong>${formatarData(mov.data)}</strong><small>${detalhe}</small></div>
+        <strong>${formatarMoeda(total, ativo.m)}</strong>
+      </div>`;
+  }).join("");
+}
+
+function preencherSelectMovimentacoes(ativoSelecionadoId = "") {
+  const ordenados = [...ativos].sort((a, b) => a.t.localeCompare(b.t, "pt-BR"));
+  movAtivo.innerHTML = ordenados.length
+    ? ordenados.map((ativo) => `<option value="${ativo.id}">${escaparHtml(ativo.t)} · ${escaparHtml(ativo.c)} · ${ativo.m}</option>`).join("")
+    : '<option value="">Nenhum ativo cadastrado</option>';
+
+  if (ativoSelecionadoId && ordenados.some((ativo) => ativo.id === ativoSelecionadoId)) {
+    movAtivo.value = ativoSelecionadoId;
+  }
+}
+
+function atualizarCamposMovimentacao() {
+  const rendimento = movTipo.value === "rendimento";
+  movQuantidadeGrupo.hidden = rendimento;
+  movQuantidade.required = !rendimento;
+  movPrecoLabel.textContent = rendimento ? "Valor recebido" : "Preço por unidade";
+  movPreco.placeholder = rendimento ? "Valor total recebido" : "0,00";
+  atualizarPreviewMovimentacao();
+}
+
+function atualizarPreviewMovimentacao() {
+  const ativo = ativos.find((item) => item.id === movAtivo.value);
+  const moedaCodigo = ativo?.m || "BRL";
+  const total = movTipo.value === "rendimento"
+    ? numeroSeguro(movPreco.value)
+    : numeroSeguro(movQuantidade.value) * numeroSeguro(movPreco.value);
+  movPreview.textContent = `${rotuloTipoMovimentacao(movTipo.value)}: ${formatarMoeda(total, moedaCodigo)}`;
+}
+
+function abrirModalMovimentacao(ativoId = "") {
+  if (!ativos.length) {
+    mostrarToast("Cadastre um ativo antes de registrar movimentações.", "error");
+    return;
+  }
+
+  formMovimentacao.reset();
+  preencherSelectMovimentacoes(ativoId);
+  movTipo.value = "compra";
+  movData.value = new Date().toISOString().slice(0, 10);
+  const ativo = ativos.find((item) => item.id === movAtivo.value);
+  movCorretora.value = ativo?.corretora || "";
+  atualizarCamposMovimentacao();
+  modalMovimentacao.showModal();
+}
+
+function fecharModalMovimentacao() {
+  modalMovimentacao.close();
+}
+
+function excluirMovimentacao(ativoId, movimentacaoId) {
+  const ativo = ativos.find((item) => item.id === ativoId);
+  const mov = ativo?.movimentacoes?.find((item) => item.id === movimentacaoId);
+  if (!ativo || !mov) return;
+
+  if (!window.confirm(`Excluir esta ${rotuloTipoMovimentacao(mov.tipo).toLowerCase()} de ${ativo.t}?`)) return;
+
+  // Reverte apenas movimentações que alteram a posição, preservando consistência da carteira.
+  if (mov.tipo === "compra") {
+    const qtdAtual = numeroSeguro(ativo.q);
+    const qtdMov = numeroSeguro(mov.q);
+    const qtdNova = Math.max(0, qtdAtual - qtdMov);
+    const custoAtual = qtdAtual * numeroSeguro(ativo.p);
+    const custoMov = qtdMov * numeroSeguro(mov.preco);
+    ativo.q = qtdNova;
+    ativo.p = qtdNova > 0 ? Math.max(0, (custoAtual - custoMov) / qtdNova) : 0;
+  } else if (mov.tipo === "venda") {
+    ativo.q = numeroSeguro(ativo.q) + numeroSeguro(mov.q);
+  }
+
+  ativo.movimentacoes = ativo.movimentacoes.filter((item) => item.id !== movimentacaoId);
+  atualizar();
+  atualizarMovimentacoes();
+  if (ativoNoDrawerId === ativo.id) renderizarHistoricoDrawer(ativo);
+  mostrarToast("Movimentação excluída.");
+}
+
+function atualizarMovimentacoes() {
+  if (!tabelaMovimentacoes) return;
+
+  const termo = buscaMovimentacao.value.trim().toUpperCase();
+  const tipoFiltro = filtroTipoMovimentacao.value;
+  const todas = obterMovimentacoesConsolidadas();
+  const filtradas = todas
+    .filter((mov) => (!termo || mov.ticker.includes(termo)) && (tipoFiltro === "Todos" || mov.tipo === tipoFiltro))
+    .sort((a, b) => {
+      const dataCmp = String(b.data || "").localeCompare(String(a.data || ""));
+      return dataCmp || String(b.id).localeCompare(String(a.id));
+    });
+
+  tabelaMovimentacoes.innerHTML = filtradas.map((mov) => {
+    const total = totalMovimentacao(mov);
+    const quantidadeTexto = mov.tipo === "rendimento" ? "—" : numeroSeguro(mov.q).toLocaleString("pt-BR");
+    const precoTexto = formatarMoeda(mov.preco, mov.moeda);
+    return `
+      <tr>
+        <td>${formatarData(mov.data)}</td>
+        <td><strong>${escaparHtml(mov.ticker)}</strong><small class="movement-asset-type">${escaparHtml(mov.categoria)}</small></td>
+        <td><span class="movement-type ${classeTipoMovimentacao(mov.tipo)}">${rotuloTipoMovimentacao(mov.tipo)}</span></td>
+        <td>${quantidadeTexto}</td>
+        <td>${precoTexto}</td>
+        <td><strong>${formatarMoeda(total, mov.moeda)}</strong></td>
+        <td>${escaparHtml(mov.corretora || "—")}</td>
+        <td>${escaparHtml(mov.observacao || "—")}</td>
+        <td><button type="button" class="table-action delete" data-delete-movement="${mov.id}" data-asset-id="${mov.ativoId}">Excluir</button></td>
+      </tr>`;
+  }).join("");
+
+  movimentacoesVazias.hidden = filtradas.length > 0;
+  contadorMovimentacoes.textContent = `${filtradas.length} ${filtradas.length === 1 ? "movimentação" : "movimentações"}`;
+  movTotalRegistros.textContent = todas.length.toLocaleString("pt-BR");
+
+  const moeda = moedaMovimentacoes;
+  const naMoeda = todas.filter((mov) => mov.moeda === moeda);
+  const compras = naMoeda.filter((mov) => mov.tipo === "compra").reduce((soma, mov) => soma + totalMovimentacao(mov), 0);
+  const vendas = naMoeda.filter((mov) => mov.tipo === "venda").reduce((soma, mov) => soma + totalMovimentacao(mov), 0);
+  const rendimentos = naMoeda.filter((mov) => mov.tipo === "rendimento").reduce((soma, mov) => soma + totalMovimentacao(mov), 0);
+
+  movTotalCompras.textContent = formatarMoeda(compras, moeda);
+  movTotalVendas.textContent = formatarMoeda(vendas, moeda);
+  movTotalRendimentos.textContent = formatarMoeda(rendimentos, moeda);
+  const rotuloMoeda = moeda === "USD" ? "Total em Dólar" : "Total em Real";
+  movComprasDetalhe.textContent = rotuloMoeda;
+  movVendasDetalhe.textContent = rotuloMoeda;
+  movRendimentosDetalhe.textContent = moeda === "USD" ? "Rendimentos em Dólar" : "Rendimentos em Real";
+
+  movementCurrencyButtons.forEach((botao) => {
+    const ativo = botao.dataset.movementCurrency === moeda;
+    botao.classList.toggle("active", ativo);
+    botao.setAttribute("aria-pressed", String(ativo));
+  });
+}
+
 function abrirView(nomeView) {
   fecharDrawerAtivo();
   const rendaAtiva = nomeView === "renda-passiva";
+  const movimentacoesAtiva = nomeView === "movimentacoes";
+  const dashboardAtivo = !rendaAtiva && !movimentacoesAtiva;
 
-  viewDashboard.hidden = rendaAtiva;
-  viewDashboard.classList.toggle("active", !rendaAtiva);
+  viewDashboard.hidden = !dashboardAtivo;
+  viewDashboard.classList.toggle("active", dashboardAtivo);
   viewRendaPassiva.hidden = !rendaAtiva;
   viewRendaPassiva.classList.toggle("active", rendaAtiva);
+  viewMovimentacoes.hidden = !movimentacoesAtiva;
+  viewMovimentacoes.classList.toggle("active", movimentacoesAtiva);
 
-  tituloPagina.textContent = rendaAtiva ? "Renda Passiva" : "Dashboard";
-  subtituloPagina.textContent = rendaAtiva
-    ? "Projeções simples para acompanhar sua renda e seus reinvestimentos"
-    : "Visão consolidada da sua carteira";
+  if (rendaAtiva) {
+    tituloPagina.textContent = "Renda Passiva";
+    subtituloPagina.textContent = "Projeções simples para acompanhar sua renda e seus reinvestimentos";
+  } else if (movimentacoesAtiva) {
+    tituloPagina.textContent = "Movimentações";
+    subtituloPagina.textContent = "Histórico de compras, vendas e rendimentos da carteira";
+  } else {
+    tituloPagina.textContent = "Dashboard";
+    subtituloPagina.textContent = "Visão consolidada da sua carteira";
+  }
 
   menuViewLinks.forEach((link) => {
     link.classList.toggle("active", link.dataset.view === nomeView);
   });
 
-  if (rendaAtiva) {
-    atualizarRendaPassiva();
-  }
+  if (rendaAtiva) atualizarRendaPassiva();
+  if (movimentacoesAtiva) atualizarMovimentacoes();
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -1792,6 +2027,88 @@ document.addEventListener("keydown", (evento) => {
   }
 });
 
+btnNovaMovimentacao.addEventListener("click", () => abrirModalMovimentacao());
+document.getElementById("btnFecharMovimentacao").addEventListener("click", fecharModalMovimentacao);
+document.getElementById("btnCancelarMovimentacao").addEventListener("click", fecharModalMovimentacao);
+movTipo.addEventListener("change", atualizarCamposMovimentacao);
+movAtivo.addEventListener("change", () => {
+  const ativo = ativos.find((item) => item.id === movAtivo.value);
+  if (ativo && !movCorretora.value) movCorretora.value = ativo.corretora || "";
+  atualizarPreviewMovimentacao();
+});
+movQuantidade.addEventListener("input", atualizarPreviewMovimentacao);
+movPreco.addEventListener("input", atualizarPreviewMovimentacao);
+buscaMovimentacao.addEventListener("input", atualizarMovimentacoes);
+filtroTipoMovimentacao.addEventListener("change", atualizarMovimentacoes);
+movementCurrencyButtons.forEach((botao) => {
+  botao.addEventListener("click", () => {
+    moedaMovimentacoes = botao.dataset.movementCurrency === "USD" ? "USD" : "BRL";
+    localStorage.setItem(MOVEMENT_CURRENCY_KEY, moedaMovimentacoes);
+    atualizarMovimentacoes();
+  });
+});
+
+tabelaMovimentacoes.addEventListener("click", (evento) => {
+  const botao = evento.target.closest("[data-delete-movement]");
+  if (!botao) return;
+  excluirMovimentacao(botao.dataset.assetId, botao.dataset.deleteMovement);
+});
+
+btnDrawerMovimentacao.addEventListener("click", () => {
+  const id = ativoNoDrawerId;
+  fecharDrawerAtivo();
+  if (id) abrirModalMovimentacao(id);
+});
+
+formMovimentacao.addEventListener("submit", (evento) => {
+  evento.preventDefault();
+  const ativo = ativos.find((item) => item.id === movAtivo.value);
+  if (!ativo) {
+    mostrarToast("Selecione um ativo válido.", "error");
+    return;
+  }
+
+  const tipo = movTipo.value;
+  const qtd = tipo === "rendimento" ? 0 : numeroSeguro(movQuantidade.value);
+  const preco = numeroSeguro(movPreco.value);
+
+  if (!movData.value || preco <= 0 || (tipo !== "rendimento" && qtd <= 0)) {
+    mostrarToast("Preencha os dados da movimentação com valores válidos.", "error");
+    return;
+  }
+
+  if (tipo === "venda" && qtd > numeroSeguro(ativo.q)) {
+    mostrarToast(`A venda excede a posição atual de ${ativo.q.toLocaleString("pt-BR")} ${ativo.t}.`, "error");
+    return;
+  }
+
+  const movimentacao = {
+    id: criarId(),
+    tipo,
+    data: validarData(movData.value),
+    q: qtd,
+    preco,
+    corretora: movCorretora.value.trim(),
+    observacao: movObservacao.value.trim()
+  };
+
+  if (tipo === "compra") {
+    const qtdAnterior = numeroSeguro(ativo.q);
+    const qtdNova = qtdAnterior + qtd;
+    ativo.p = qtdNova > 0 ? ((qtdAnterior * numeroSeguro(ativo.p)) + (qtd * preco)) / qtdNova : 0;
+    ativo.q = qtdNova;
+  } else if (tipo === "venda") {
+    ativo.q = Math.max(0, numeroSeguro(ativo.q) - qtd);
+  }
+
+  ativo.corretora = movimentacao.corretora || ativo.corretora;
+  ativo.data = movimentacao.data || ativo.data;
+  ativo.movimentacoes = [...(ativo.movimentacoes || []), movimentacao];
+  modalMovimentacao.close();
+  atualizar();
+  mostrarToast(`${rotuloTipoMovimentacao(tipo)} de ${ativo.t} registrada.`);
+});
+
 formAtivo.addEventListener("submit", (evento) => {
   evento.preventDefault();
 
@@ -1911,5 +2228,11 @@ modalImportacao.addEventListener("close", () => {
 inicializarTema();
 carregarStatusCotacoes();
 atualizar();
-abrirView(location.hash === "#renda-passiva" ? "renda-passiva" : "dashboard");
+abrirView(
+  location.hash === "#renda-passiva"
+    ? "renda-passiva"
+    : location.hash === "#movimentacoes"
+      ? "movimentacoes"
+      : "dashboard"
+);
 iniciarAtualizacaoAutomaticaBrapi();

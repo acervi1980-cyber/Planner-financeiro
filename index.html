@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.9.5</title>
+  <title>Planner Financeiro · v1.9.6</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -25,14 +25,14 @@
         <a href="#carteira" data-scroll="carteira">Carteira</a>
         <a href="#renda-passiva" data-view="renda-passiva">Renda Passiva</a>
         <a href="#" aria-disabled="true">Dividendos</a>
-        <a href="#" aria-disabled="true">Movimentações</a>
+        <a href="#movimentacoes" data-view="movimentacoes">Movimentações</a>
         <a href="#" aria-disabled="true">Metas</a>
         <a href="#" aria-disabled="true">Análises</a>
       </nav>
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.9.5 · Cotações automáticas BRAPI</span>
+        <span>Versão 1.9.6 · Movimentações e histórico</span>
       </div>
     </aside>
 
@@ -371,6 +371,86 @@
           </article>
         </section>
       </section>
+
+      <section class="app-view" id="viewMovimentacoes" hidden>
+        <section class="movements-hero">
+          <div>
+            <span class="eyebrow">Histórico da carteira</span>
+            <h2>Movimentações</h2>
+            <p>Registre compras, vendas e rendimentos para manter o histórico de cada ativo organizado.</p>
+          </div>
+          <button type="button" id="btnNovaMovimentacao">+ Nova movimentação</button>
+        </section>
+
+        <section class="movement-summary" aria-label="Resumo das movimentações">
+          <article class="card movement-card">
+            <small>Movimentações registradas</small>
+            <h2 id="movTotalRegistros">0</h2>
+            <span class="card-detail">Histórico consolidado</span>
+          </article>
+          <article class="card movement-card">
+            <small>Compras</small>
+            <h2 id="movTotalCompras">R$ 0,00</h2>
+            <span class="card-detail" id="movComprasDetalhe">Total em Real</span>
+          </article>
+          <article class="card movement-card">
+            <small>Vendas</small>
+            <h2 id="movTotalVendas">R$ 0,00</h2>
+            <span class="card-detail" id="movVendasDetalhe">Total em Real</span>
+          </article>
+          <article class="card movement-card">
+            <small>Rendimentos recebidos</small>
+            <h2 id="movTotalRendimentos">R$ 0,00</h2>
+            <span class="card-detail" id="movRendimentosDetalhe">Dividendos e rendimentos</span>
+          </article>
+        </section>
+
+        <section class="panel movements-panel">
+          <div class="panel-header portfolio-header">
+            <div>
+              <h3>Histórico de movimentações</h3>
+              <small id="contadorMovimentacoes">0 movimentações</small>
+            </div>
+            <div class="movement-currency-toggle currency-toggle" role="group" aria-label="Moeda do resumo de movimentações">
+              <button type="button" class="movement-currency-button active" data-movement-currency="BRL">R$ Real</button>
+              <button type="button" class="movement-currency-button" data-movement-currency="USD">US$ Dólar</button>
+            </div>
+          </div>
+
+          <div class="movement-tools">
+            <input id="buscaMovimentacao" type="search" placeholder="Buscar por ticker..." autocomplete="off">
+            <select id="filtroTipoMovimentacao" aria-label="Filtrar por tipo de movimentação">
+              <option value="Todos">Todos os tipos</option>
+              <option value="compra">Compras</option>
+              <option value="venda">Vendas</option>
+              <option value="rendimento">Rendimentos</option>
+            </select>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="movements-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Ativo</th>
+                  <th>Tipo</th>
+                  <th>Quantidade</th>
+                  <th>Preço / valor</th>
+                  <th>Total</th>
+                  <th>Corretora</th>
+                  <th>Observação</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaMovimentacoes"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="movimentacoesVazias" hidden>
+            <strong>Nenhuma movimentação encontrada.</strong>
+            <span>Registre uma compra, venda ou rendimento para começar o histórico.</span>
+          </div>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -494,11 +574,75 @@
       </div>
     </section>
 
+    <section class="drawer-history-card">
+      <div class="drawer-history-heading">
+        <div>
+          <span>Histórico do ativo</span>
+          <small id="drawerHistoricoResumo">Nenhuma movimentação registrada</small>
+        </div>
+        <button type="button" class="secondary compact-button" id="btnDrawerMovimentacao">+ Movimentação</button>
+      </div>
+      <div class="drawer-history-list" id="drawerHistorico"></div>
+    </section>
+
     <div class="asset-drawer-actions">
       <button type="button" id="btnDrawerEditar">Editar ativo</button>
       <button type="button" class="secondary" id="btnDrawerExcluir">Excluir</button>
     </div>
   </aside>
+
+  <dialog id="modalMovimentacao">
+    <form id="formMovimentacao">
+      <div class="dialog-heading">
+        <div>
+          <h3 id="tituloModalMovimentacao">Nova movimentação</h3>
+          <small>Registre uma operação no histórico do ativo.</small>
+        </div>
+        <button type="button" class="icon-button close-button" id="btnFecharMovimentacao" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="field-group form-grid-full">
+          <label for="movAtivo">Ativo</label>
+          <select id="movAtivo" required></select>
+        </div>
+        <div class="field-group">
+          <label for="movTipo">Tipo</label>
+          <select id="movTipo" required>
+            <option value="compra">Compra</option>
+            <option value="venda">Venda</option>
+            <option value="rendimento">Dividendo / rendimento</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label for="movData">Data</label>
+          <input id="movData" type="date" required>
+        </div>
+        <div class="field-group" id="movQuantidadeGrupo">
+          <label for="movQuantidade">Quantidade</label>
+          <input id="movQuantidade" type="number" min="0" step="any" placeholder="0">
+        </div>
+        <div class="field-group">
+          <label for="movPreco" id="movPrecoLabel">Preço por unidade</label>
+          <input id="movPreco" type="number" min="0" step="0.01" placeholder="0,00" required>
+        </div>
+        <div class="field-group form-grid-full">
+          <label for="movCorretora">Corretora</label>
+          <input id="movCorretora" placeholder="Ex.: Caixa, XP, Avenue..." autocomplete="organization">
+        </div>
+        <div class="field-group form-grid-full">
+          <label for="movObservacao">Observação</label>
+          <input id="movObservacao" placeholder="Opcional">
+        </div>
+      </div>
+
+      <div class="movement-preview" id="movPreview">Total da operação: R$ 0,00</div>
+      <div class="dialog-actions">
+        <button type="submit">Salvar movimentação</button>
+        <button type="button" class="secondary" id="btnCancelarMovimentacao">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="modalExcluir" class="confirm-dialog">
     <div class="confirm-content">
