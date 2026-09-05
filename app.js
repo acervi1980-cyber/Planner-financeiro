@@ -260,6 +260,38 @@ function consolidarAtivosDuplicados(lista) {
   return [...consolidados.values()];
 }
 
+function migrarHistoricoInicial(lista) {
+  let houveMigracao = false;
+
+  const migrados = lista.map((ativo) => {
+    if ((ativo.movimentacoes || []).length > 0) return ativo;
+
+    const quantidade = numeroSeguro(ativo.q);
+    const precoMedio = numeroSeguro(ativo.p);
+
+    // Ativos cadastrados antes da v1.9.6 já tinham posição, data e corretora,
+    // mas ainda não possuíam histórico. Criamos uma compra inicial apenas
+    // para representar a posição existente, sem recalcular ou alterar a carteira.
+    if (quantidade <= 0 || precoMedio <= 0) return ativo;
+
+    houveMigracao = true;
+    return {
+      ...ativo,
+      movimentacoes: [{
+        id: criarId(),
+        tipo: "compra",
+        data: ativo.data || "",
+        q: quantidade,
+        preco: precoMedio,
+        corretora: ativo.corretora || "",
+        observacao: "Posição inicial migrada automaticamente para o histórico."
+      }]
+    };
+  });
+
+  return { migrados, houveMigracao };
+}
+
 function carregarAtivos() {
   try {
     const dados = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
@@ -268,9 +300,16 @@ function carregarAtivos() {
       return [];
     }
 
-    return consolidarAtivosDuplicados(
+    const consolidados = consolidarAtivosDuplicados(
       dados.map(normalizarAtivo).filter((ativo) => ativo.t)
     );
+    const { migrados, houveMigracao } = migrarHistoricoInicial(consolidados);
+
+    if (houveMigracao) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrados));
+    }
+
+    return migrados;
   } catch (erro) {
     console.error("Não foi possível carregar a carteira:", erro);
     return [];
