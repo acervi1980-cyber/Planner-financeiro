@@ -1832,7 +1832,9 @@ async function atualizarCotacoes() {
     } else if (erro?.status === 401 || erro?.status === 403) {
       quotesStatusText.textContent = "A BRAPI recusou o token configurado no Netlify. As cotações anteriores foram preservadas.";
     } else {
-      quotesStatusText.textContent = "As cotações anteriores foram preservadas. Tente novamente em alguns instantes.";
+      const detalheSeguro = String(erro?.message || "Erro desconhecido na consulta.").trim();
+      const statusSeguro = Number.isFinite(Number(erro?.status)) ? `HTTP ${erro.status}: ` : "";
+      quotesStatusText.textContent = `${statusSeguro}${detalheSeguro} As cotações anteriores foram preservadas.`;
     }
 
     quotesStatusTime.textContent = "Falha na atualização";

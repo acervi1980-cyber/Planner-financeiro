@@ -20,16 +20,30 @@ function normalizarTickers(valor) {
   )];
 }
 
+function resumoSeguro(payload) {
+  try {
+    const texto = typeof payload === "string" ? payload : JSON.stringify(payload);
+    return String(texto || "").slice(0, 1500);
+  } catch (_) {
+    return "[resposta não serializável]";
+  }
+}
+
 export default async (request) => {
+  const requestId = crypto.randomUUID().slice(0, 8);
+
   if (request.method !== "GET") {
-    return json({ error: "Método não permitido." }, 405);
+    console.warn(`[BRAPI ${requestId}] método não permitido: ${request.method}`);
+    return json({ error: "Método não permitido.", requestId }, 405);
   }
 
   const token = (process.env.BRAPI_TOKEN || "").trim();
   if (!token) {
+    console.error(`[BRAPI ${requestId}] BRAPI_TOKEN ausente no ambiente do Netlify.`);
     return json({
       error: "BRAPI_TOKEN não está configurado no Netlify.",
-      code: "BRAPI_TOKEN_MISSING"
+      code: "BRAPI_TOKEN_MISSING",
+      requestId
     }, 500);
   }
 
@@ -37,20 +51,22 @@ export default async (request) => {
   const tickers = normalizarTickers(url.searchParams.get("symbols"));
 
   if (!tickers.length) {
-    return json({ error: "Informe ao menos um ticker em symbols." }, 400);
+    return json({ error: "Informe ao menos um ticker em symbols.", requestId }, 400);
   }
 
   if (tickers.length > MAX_TICKERS) {
-    return json({ error: `Máximo de ${MAX_TICKERS} tickers por consulta.` }, 400);
+    return json({ error: `Máximo de ${MAX_TICKERS} tickers por consulta.`, requestId }, 400);
   }
 
   const invalidos = tickers.filter((ticker) => !/^[A-Z0-9]{4,12}$/.test(ticker));
   if (invalidos.length) {
-    return json({ error: `Ticker inválido: ${invalidos.join(", ")}.` }, 400);
+    return json({ error: `Ticker inválido: ${invalidos.join(", ")}.`, requestId }, 400);
   }
 
   const endpoint = new URL(BRAPI_ENDPOINT);
   endpoint.searchParams.set("symbols", tickers.join(","));
+
+  console.log(`[BRAPI ${requestId}] consultando ${tickers.join(",")} via v2; token presente=${Boolean(token)}.`);
 
   try {
     const resposta = await fetch(endpoint, {
@@ -61,18 +77,24 @@ export default async (request) => {
       signal: AbortSignal.timeout(12000)
     });
 
+    const textoResposta = await resposta.text();
     let dados = null;
     try {
-      dados = await resposta.json();
+      dados = textoResposta ? JSON.parse(textoResposta) : null;
     } catch (_) {
-      // Mantemos uma mensagem genérica abaixo se a BRAPI não devolver JSON.
+      dados = null;
     }
 
+    console.log(`[BRAPI ${requestId}] upstream HTTP ${resposta.status} ${resposta.statusText || ""}; tickers=${tickers.join(",")}.`);
+
     if (!resposta.ok) {
-      const mensagem = dados?.message || dados?.error || `BRAPI respondeu HTTP ${resposta.status}.`;
+      console.error(`[BRAPI ${requestId}] upstream erro HTTP ${resposta.status}; corpo=${resumoSeguro(dados || textoResposta)}`);
+      const mensagem = dados?.message || dados?.error || textoResposta || `BRAPI respondeu HTTP ${resposta.status}.`;
       return json({
-        error: mensagem,
-        code: "BRAPI_UPSTREAM_ERROR"
+        error: String(mensagem).slice(0, 500),
+        code: "BRAPI_UPSTREAM_ERROR",
+        upstreamStatus: resposta.status,
+        requestId
       }, resposta.status);
     }
 
@@ -86,15 +108,19 @@ export default async (request) => {
         }))
       : [];
 
+    console.log(`[BRAPI ${requestId}] sucesso; resultados=${results.length}.`);
+
     return json({
       results,
-      requestedAt: dados?.requestedAt || new Date().toISOString()
+      requestedAt: dados?.requestedAt || new Date().toISOString(),
+      requestId
     });
   } catch (error) {
-    console.error("Falha ao consultar BRAPI:", error);
+    console.error(`[BRAPI ${requestId}] falha de rede/runtime:`, error?.name, error?.message);
     return json({
-      error: "Não foi possível consultar a BRAPI neste momento.",
-      code: "BRAPI_FETCH_FAILED"
+      error: `Falha de rede/runtime ao consultar a BRAPI: ${String(error?.message || "erro desconhecido").slice(0, 300)}`,
+      code: "BRAPI_FETCH_FAILED",
+      requestId
     }, 502);
   }
 };
