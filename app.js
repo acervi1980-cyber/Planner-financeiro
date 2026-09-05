@@ -1774,7 +1774,9 @@ async function atualizarCotacoes() {
 
   try {
     const resultados = [];
-    const TAMANHO_LOTE = 20;
+    // O plano atual da BRAPI aceita no máximo 1 ativo por requisição.
+    // Consultamos cada ticker separadamente e consolidamos os resultados no Planner.
+    const TAMANHO_LOTE = 1;
 
     for (let i = 0; i < tickersConsulta.length; i += TAMANHO_LOTE) {
       const lote = tickersConsulta.slice(i, i + TAMANHO_LOTE);
