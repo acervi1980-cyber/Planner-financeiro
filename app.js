@@ -39,9 +39,8 @@ const quotesStatusTitle = document.getElementById("quotesStatusTitle");
 const quotesStatusText = document.getElementById("quotesStatusText");
 const quotesStatusTime = document.getElementById("quotesStatusTime");
 const btnConfigurarBrapi = document.getElementById("btnConfigurarBrapi");
-const QUOTES_STATUS_KEY = "planner-quotes-status";
-const BRAPI_TOKEN_KEY = "planner-brapi-token";
-const BRAPI_FREE_TICKERS = new Set(["PETR4", "MGLU3", "VALE3", "ITUB4"]);
+const QUOTES_STATUS_KEY = "planner-quotes-status-v2";
+const BRAPI_PROXY_URL = "/.netlify/functions/brapi-quotes";
 const BRAPI_AUTO_INTERVAL_MS = 15 * 60 * 1000;
 const BRAPI_AUTO_FRESHNESS_MS = 5 * 60 * 1000;
 let atualizacaoAutomaticaEmAndamento = false;
@@ -1675,47 +1674,12 @@ function formatarDataHoraCotacoes(dataIso) {
   }).format(data);
 }
 
-function obterTokenBrapi() {
-  try {
-    return (localStorage.getItem(BRAPI_TOKEN_KEY) || "").trim();
-  } catch (erro) {
-    console.warn("Não foi possível ler o token da BRAPI.", erro);
-    return "";
-  }
-}
-
 function configurarBrapi() {
-  const tokenAtual = obterTokenBrapi();
-  const resposta = window.prompt(
-    "Cole seu token da BRAPI. Ele ficará salvo somente neste navegador e não será enviado ao GitHub.\n\nDeixe em branco e confirme para remover o token.",
-    tokenAtual
+  window.alert(
+    "A BRAPI agora usa uma integração segura pelo Netlify.\n\n" +
+    "O token não é mais salvo neste navegador nem enviado pelo site. " +
+    "Ele deve ser configurado no Netlify como a variável de ambiente BRAPI_TOKEN."
   );
-
-  if (resposta === null) return;
-
-  const token = resposta.trim();
-
-  try {
-    if (token) {
-      localStorage.setItem(BRAPI_TOKEN_KEY, token);
-      quotesStatusPanel.classList.remove("is-error");
-      quotesStatusPanel.classList.add("is-success");
-      quotesStatusIcon.textContent = "✓";
-      quotesStatusTitle.textContent = "BRAPI configurada";
-      quotesStatusText.textContent = "Token salvo apenas neste navegador. Agora você pode atualizar as cotações da B3.";
-      mostrarToast("Token da BRAPI salvo neste navegador.");
-    } else {
-      localStorage.removeItem(BRAPI_TOKEN_KEY);
-      quotesStatusPanel.classList.remove("is-success", "is-error");
-      quotesStatusIcon.textContent = "◷";
-      quotesStatusTitle.textContent = "BRAPI sem token";
-      quotesStatusText.textContent = "Sem token, somente os tickers gratuitos de teste da BRAPI podem ser consultados.";
-      mostrarToast("Token da BRAPI removido.");
-    }
-  } catch (erro) {
-    console.error("Não foi possível salvar o token da BRAPI.", erro);
-    mostrarToast("Não foi possível salvar o token da BRAPI.", true);
-  }
 }
 
 function tickerConsultaBrapi(ativo) {
@@ -1735,31 +1699,28 @@ function ativosElegiveisBrapi() {
   return ativos.filter((ativo) => ativo.m === "BRL" && categoriasB3.has(ativo.c) && ativo.t);
 }
 
-async function buscarLoteBrapi(tickers, token) {
-  const url = `https://brapi.dev/api/quote/${tickers.map(encodeURIComponent).join(",")}`;
-  const headers = { Accept: "application/json" };
+async function buscarLoteBrapi(tickers) {
+  const parametros = new URLSearchParams({ symbols: tickers.join(",") });
+  const resposta = await fetch(`${BRAPI_PROXY_URL}?${parametros.toString()}`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store"
+  });
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  let dados = null;
+  try {
+    dados = await resposta.json();
+  } catch (_) {
+    // Mantemos o tratamento abaixo para respostas sem JSON.
   }
 
-  const resposta = await fetch(url, { headers, cache: "no-store" });
-
   if (!resposta.ok) {
-    let detalhe = "";
-    try {
-      const corpo = await resposta.json();
-      detalhe = corpo?.message || corpo?.error || "";
-    } catch (_) {
-      // resposta sem JSON; mantemos apenas o status HTTP
-    }
-
-    const erro = new Error(detalhe || `BRAPI respondeu HTTP ${resposta.status}.`);
+    const detalhe = dados?.message || dados?.error || `Proxy BRAPI respondeu HTTP ${resposta.status}.`;
+    const erro = new Error(detalhe);
     erro.status = resposta.status;
+    erro.code = dados?.code || "";
     throw erro;
   }
 
-  const dados = await resposta.json();
   return Array.isArray(dados?.results) ? dados.results : [];
 }
 
@@ -1767,6 +1728,8 @@ function carregarStatusCotacoes() {
   let ultimaVerificacao = "";
 
   try {
+    // Remove o token antigo que a v1.9.7 guardava no navegador.
+    localStorage.removeItem("planner-brapi-token");
     ultimaVerificacao = localStorage.getItem(QUOTES_STATUS_KEY) || "";
   } catch (erro) {
     console.warn("Não foi possível ler o status das cotações.", erro);
@@ -1778,10 +1741,10 @@ function carregarStatusCotacoes() {
     quotesStatusPanel.classList.add("is-success");
     quotesStatusIcon.textContent = "✓";
     quotesStatusTitle.textContent = "Cotações da B3 atualizadas";
-    quotesStatusText.textContent = "A última consulta pela BRAPI foi concluída. Ativos em dólar permanecem manuais nesta etapa.";
-  } else if (obterTokenBrapi()) {
-    quotesStatusTitle.textContent = "BRAPI pronta";
-    quotesStatusText.textContent = "Token configurado. Clique em Atualizar cotações para consultar os ativos da B3.";
+    quotesStatusText.textContent = "A última consulta foi feita pela função segura do Netlify. Ativos em dólar permanecem manuais nesta etapa.";
+  } else {
+    quotesStatusTitle.textContent = "BRAPI segura via Netlify";
+    quotesStatusText.textContent = "O Planner consulta a BRAPI pelo backend do Netlify, sem expor o token no navegador.";
   }
 }
 
@@ -1789,8 +1752,6 @@ async function atualizarCotacoes() {
   if (!btnAtualizarCotacoes || btnAtualizarCotacoes.disabled) return;
 
   const ativosB3 = ativosElegiveisBrapi();
-  const token = obterTokenBrapi();
-
   if (!ativosB3.length) {
     quotesStatusPanel.classList.remove("is-success", "is-loading", "is-error");
     quotesStatusIcon.textContent = "i";
@@ -1801,19 +1762,6 @@ async function atualizarCotacoes() {
   }
 
   const tickersConsulta = [...new Set(ativosB3.map(tickerConsultaBrapi).filter(Boolean))];
-  const precisaToken = tickersConsulta.some((ticker) => !BRAPI_FREE_TICKERS.has(ticker));
-
-  if (precisaToken && !token) {
-    quotesStatusPanel.classList.remove("is-success", "is-loading");
-    quotesStatusPanel.classList.add("is-error");
-    quotesStatusIcon.textContent = "!";
-    quotesStatusTitle.textContent = "Configure o token da BRAPI";
-    quotesStatusText.textContent = "Clique em ⚙ BRAPI e cole seu token. Ele será guardado somente neste navegador.";
-    quotesStatusTime.textContent = "Aguardando configuração";
-    mostrarToast("Configure o token da BRAPI antes de atualizar.", true);
-    return;
-  }
-
   btnAtualizarCotacoes.disabled = true;
   btnAtualizarCotacoes.classList.add("is-loading");
   btnAtualizarCotacoes.textContent = "Atualizando B3...";
@@ -1830,7 +1778,7 @@ async function atualizarCotacoes() {
 
     for (let i = 0; i < tickersConsulta.length; i += TAMANHO_LOTE) {
       const lote = tickersConsulta.slice(i, i + TAMANHO_LOTE);
-      const respostaLote = await buscarLoteBrapi(lote, token);
+      const respostaLote = await buscarLoteBrapi(lote);
       resultados.push(...respostaLote);
     }
 
@@ -1838,7 +1786,7 @@ async function atualizarCotacoes() {
 
     resultados.forEach((resultado) => {
       const simbolo = String(resultado?.symbol || resultado?.stock || "").trim().toUpperCase();
-      const preco = numeroSeguro(resultado?.regularMarketPrice, NaN);
+      const preco = numeroSeguro(resultado?.price ?? resultado?.regularMarketPrice ?? resultado?.data?.regularMarketPrice, NaN);
       if (simbolo && Number.isFinite(preco) && preco > 0) {
         precos.set(simbolo, preco);
       }
@@ -1879,10 +1827,12 @@ async function atualizarCotacoes() {
     quotesStatusIcon.textContent = "!";
     quotesStatusTitle.textContent = "Não foi possível atualizar pela BRAPI";
 
-    if (erro?.status === 401 || erro?.status === 403) {
-      quotesStatusText.textContent = "O token da BRAPI foi recusado. Clique em ⚙ BRAPI para conferir ou substituir o token.";
+    if (erro?.code === "BRAPI_TOKEN_MISSING") {
+      quotesStatusText.textContent = "Falta configurar BRAPI_TOKEN nas variáveis de ambiente do Netlify. As cotações anteriores foram preservadas.";
+    } else if (erro?.status === 401 || erro?.status === 403) {
+      quotesStatusText.textContent = "A BRAPI recusou o token configurado no Netlify. As cotações anteriores foram preservadas.";
     } else {
-      quotesStatusText.textContent = "As cotações anteriores foram preservadas. Confira sua conexão e tente novamente.";
+      quotesStatusText.textContent = "As cotações anteriores foram preservadas. Tente novamente em alguns instantes.";
     }
 
     quotesStatusTime.textContent = "Falha na atualização";
@@ -1911,22 +1861,6 @@ async function atualizarCotacoesAutomaticamente({ forcar = false } = {}) {
 
   const ativosB3 = ativosElegiveisBrapi();
   if (!ativosB3.length) return;
-
-  const token = obterTokenBrapi();
-  const tickers = [...new Set(ativosB3.map(tickerConsultaBrapi).filter(Boolean))];
-  const precisaToken = tickers.some((ticker) => !BRAPI_FREE_TICKERS.has(ticker));
-
-  // Sem token, não interrompe a navegação com erro automático.
-  // O botão manual e o botão de configuração continuam disponíveis.
-  if (precisaToken && !token) {
-    quotesStatusPanel.classList.remove("is-loading", "is-success");
-    quotesStatusPanel.classList.add("is-error");
-    quotesStatusIcon.textContent = "!";
-    quotesStatusTitle.textContent = "Atualização automática aguardando BRAPI";
-    quotesStatusText.textContent = "Configure o token uma única vez em ⚙ BRAPI. Depois, o Planner atualizará a B3 automaticamente ao abrir.";
-    quotesStatusTime.textContent = "Token necessário";
-    return;
-  }
 
   if (!forcar && ultimaCotacaoAindaRecente()) return;
 
