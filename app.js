@@ -1679,7 +1679,7 @@ function configurarBrapi() {
   window.alert(
     "As APIs de cotações usam integrações seguras pelo Netlify.\n\n" +
     "Brasil: BRAPI_TOKEN\n" +
-    "Estados Unidos: FINNHUB_TOKEN\n\n" +
+    "Internacional (EUA/UCITS Londres): FINNHUB_TOKEN\n\n" +
     "Os tokens ficam nas variáveis de ambiente do Netlify e não são expostos no navegador."
   );
 }
@@ -1703,8 +1703,22 @@ function ativosElegiveisBrapi() {
 
 
 function ativosElegiveisFinnhub() {
-  const categoriasEua = new Set(["Stock", "ETF Internacional"]);
-  return ativos.filter((ativo) => ativo.m === "USD" && categoriasEua.has(ativo.c) && ativo.t);
+  const categoriasInternacionais = new Set(["Stock", "ETF Internacional"]);
+  return ativos.filter((ativo) => ativo.m === "USD" && categoriasInternacionais.has(ativo.c) && ativo.t);
+}
+
+function simbolosConsultaFinnhub(ativo) {
+  const tickerBase = String(ativo?.t || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!tickerBase) return [];
+
+  // Se o usuário já informou um sufixo de bolsa (ex.: CSPX.L), respeitamos exatamente o ticker.
+  if (tickerBase.includes(".")) return [tickerBase];
+
+  // ETFs internacionais/UCITS em USD oferecidos pela Avenue podem ser listados em Londres.
+  // Primeiro tentamos o ticker como cadastrado e, se a Finnhub não encontrar, tentamos o RIC da LSE (.L).
+  if (ativo?.c === "ETF Internacional") return [tickerBase, `${tickerBase}.L`];
+
+  return [tickerBase];
 }
 
 async function buscarCotacaoFinnhub(tickerAtivo) {
@@ -1726,6 +1740,25 @@ async function buscarCotacaoFinnhub(tickerAtivo) {
   }
 
   return dados;
+}
+
+async function buscarCotacaoFinnhubAtivo(ativo) {
+  const candidatos = simbolosConsultaFinnhub(ativo);
+  let ultimoErro = null;
+
+  for (const simbolo of candidatos) {
+    try {
+      const dados = await buscarCotacaoFinnhub(simbolo);
+      return { ...dados, symbolRequested: simbolo };
+    } catch (erro) {
+      ultimoErro = erro;
+      // Ticker não encontrado: tenta o próximo formato, como CSPX -> CSPX.L.
+      if (erro?.status === 404 || erro?.code === "QUOTE_NOT_FOUND") continue;
+      throw erro;
+    }
+  }
+
+  throw ultimoErro || new Error(`Nenhuma cotação válida encontrada para ${ativo?.t || "o ativo"}.`);
 }
 
 async function buscarLoteBrapi(tickers) {
@@ -1770,7 +1803,7 @@ function carregarStatusCotacoes() {
     quotesStatusPanel.classList.add("is-success");
     quotesStatusIcon.textContent = "✓";
     quotesStatusTitle.textContent = "Cotações atualizadas";
-    quotesStatusText.textContent = "A última consulta usou as funções seguras do Netlify para B3 e ativos dos EUA.";
+    quotesStatusText.textContent = "A última consulta usou as funções seguras do Netlify para B3, EUA e ETFs internacionais/UCITS.";
   } else {
     quotesStatusTitle.textContent = "Cotações seguras via Netlify";
     quotesStatusText.textContent = "O Planner consulta BRAPI e Finnhub pelo backend do Netlify, sem expor tokens no navegador.";
@@ -1781,8 +1814,8 @@ async function atualizarCotacoes() {
   if (!btnAtualizarCotacoes || btnAtualizarCotacoes.disabled) return;
 
   const ativosB3 = ativosElegiveisBrapi();
-  const ativosEua = ativosElegiveisFinnhub();
-  if (!ativosB3.length && !ativosEua.length) {
+  const ativosInternacionais = ativosElegiveisFinnhub();
+  if (!ativosB3.length && !ativosInternacionais.length) {
     quotesStatusPanel.classList.remove("is-success", "is-loading", "is-error");
     quotesStatusIcon.textContent = "i";
     quotesStatusTitle.textContent = "Nenhum ativo elegível para atualizar";
@@ -1798,11 +1831,11 @@ async function atualizarCotacoes() {
   quotesStatusPanel.classList.add("is-loading");
   quotesStatusIcon.textContent = "↻";
   quotesStatusTitle.textContent = "Atualizando cotações";
-  quotesStatusText.textContent = `Consultando ${ativosB3.length} ativo(s) da B3 e ${ativosEua.length} ativo(s) dos EUA...`;
+  quotesStatusText.textContent = `Consultando ${ativosB3.length} ativo(s) da B3 e ${ativosInternacionais.length} ativo(s) internacional(is)...`;
   quotesStatusTime.textContent = "Em andamento";
 
   let atualizadosB3 = 0;
-  let atualizadosEua = 0;
+  let atualizadosInternacionais = 0;
   const falhas = [];
   const naoEncontrados = [];
 
@@ -1833,14 +1866,14 @@ async function atualizarCotacoes() {
     }
   }
 
-  if (ativosEua.length) {
-    for (const ativo of ativosEua) {
+  if (ativosInternacionais.length) {
+    for (const ativo of ativosInternacionais) {
       try {
-        const dados = await buscarCotacaoFinnhub(ativo.t);
+        const dados = await buscarCotacaoFinnhubAtivo(ativo);
         const novoPreco = numeroSeguro(dados?.price ?? dados?.c, NaN);
         if (Number.isFinite(novoPreco) && novoPreco > 0) {
           ativo.cot = novoPreco;
-          atualizadosEua += 1;
+          atualizadosInternacionais += 1;
         } else naoEncontrados.push(ativo.t);
       } catch (erro) {
         console.error(`Falha na Finnhub para ${ativo.t}:`, erro);
@@ -1850,7 +1883,7 @@ async function atualizarCotacoes() {
     }
   }
 
-  const totalAtualizados = atualizadosB3 + atualizadosEua;
+  const totalAtualizados = atualizadosB3 + atualizadosInternacionais;
   if (totalAtualizados > 0) {
     const agora = new Date().toISOString();
     localStorage.setItem(QUOTES_STATUS_KEY, agora);
@@ -1859,12 +1892,12 @@ async function atualizarCotacoes() {
     quotesStatusPanel.classList.add("is-success");
     quotesStatusIcon.textContent = "✓";
     quotesStatusTitle.textContent = `${totalAtualizados} ${totalAtualizados === 1 ? "cotação atualizada" : "cotações atualizadas"}`;
-    const partes = [`Brasil: ${atualizadosB3}`, `EUA: ${atualizadosEua}`];
+    const partes = [`Brasil: ${atualizadosB3}`, `Internacional: ${atualizadosInternacionais}`];
     if (naoEncontrados.length) partes.push(`sem cotação: ${naoEncontrados.join(", ")}`);
     if (falhas.length) partes.push(`atenção: ${falhas.join("; ")}`);
     quotesStatusText.textContent = partes.join(" · ");
     quotesStatusTime.textContent = formatarDataHoraCotacoes(agora);
-    mostrarToast(`${totalAtualizados} cotações atualizadas (B3 + EUA).`);
+    mostrarToast(`${totalAtualizados} cotações atualizadas (B3 + internacional).`);
   } else {
     quotesStatusPanel.classList.remove("is-loading", "is-success");
     quotesStatusPanel.classList.add("is-error");
@@ -1896,8 +1929,8 @@ async function atualizarCotacoesAutomaticamente({ forcar = false } = {}) {
   if (atualizacaoAutomaticaEmAndamento || document.hidden) return;
 
   const ativosB3 = ativosElegiveisBrapi();
-  const ativosEua = ativosElegiveisFinnhub();
-  if (!ativosB3.length && !ativosEua.length) return;
+  const ativosInternacionais = ativosElegiveisFinnhub();
+  if (!ativosB3.length && !ativosInternacionais.length) return;
 
   if (!forcar && ultimaCotacaoAindaRecente()) return;
 
