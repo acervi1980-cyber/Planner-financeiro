@@ -24,6 +24,7 @@ const favorito = document.getElementById("favorito");
 const tabela = document.getElementById("tb");
 const buscaAtivo = document.getElementById("buscaAtivo");
 const filtroCategoria = document.getElementById("filtroCategoria");
+const categoryQuickFilters = document.getElementById("categoryQuickFilters");
 const somenteFavoritos = document.getElementById("somenteFavoritos");
 const estadoVazio = document.getElementById("estadoVazio");
 const contadorAtivos = document.getElementById("contadorAtivos");
@@ -211,6 +212,7 @@ function normalizarAtivo(ativo) {
   return {
     id: String(ativo.id || criarId()),
     t: String(ativo.t ?? ativo.ticker ?? "").trim().toUpperCase(),
+    tickerMercado: String(ativo.tickerMercado ?? "").trim().toUpperCase(),
     c: tipo,
     m: ativo.m ?? ativo.moeda ?? inferirMoeda(tipo),
     q: numeroSeguro(ativo.q ?? ativo.quantidade),
@@ -330,7 +332,7 @@ function validarData(valor) {
 }
 
 function inferirMoeda(tipo) {
-  return tipo === "Stock" || tipo === "ETF Internacional" ? "USD" : "BRL";
+  return tipo === "Stock" || tipo === "ETF Internacional" || tipo === "REIT" ? "USD" : "BRL";
 }
 
 function formatarMoeda(valor, codigoMoeda) {
@@ -378,6 +380,39 @@ function escaparHtml(valor) {
 
 function salvarLocalmente() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ativos));
+}
+
+function rotuloCategoriaCarteira(categoriaAtivo) {
+  const rotulos = {
+    Todos: "Todos",
+    "Ação": "Ações",
+    FII: "FIIs",
+    Stock: "Stocks",
+    REIT: "REITs",
+    "ETF Brasil": "ETFs Brasil",
+    "ETF Internacional": "ETFs / UCITS",
+    BDR: "BDRs",
+    "Renda Fixa": "Renda Fixa"
+  };
+  return rotulos[categoriaAtivo] || categoriaAtivo;
+}
+
+function atualizarFiltrosRapidosCategoria() {
+  if (!categoryQuickFilters || !filtroCategoria) return;
+
+  const contagens = ativos.reduce((mapa, ativo) => {
+    mapa.set(ativo.c, (mapa.get(ativo.c) || 0) + 1);
+    return mapa;
+  }, new Map());
+
+  const ordem = ["Todos", "Ação", "FII", "Stock", "REIT", "ETF Brasil", "ETF Internacional", "BDR", "Renda Fixa"];
+  const categorias = ordem.filter((cat) => cat === "Todos" || contagens.has(cat));
+  const selecionada = filtroCategoria.value || "Todos";
+
+  categoryQuickFilters.innerHTML = categorias.map((cat) => {
+    const quantidadeCategoria = cat === "Todos" ? ativos.length : (contagens.get(cat) || 0);
+    return `<button type="button" class="category-chip ${selecionada === cat ? "active" : ""}" data-category-filter="${escaparHtml(cat)}">${escaparHtml(rotuloCategoriaCarteira(cat))}<span>${quantidadeCategoria}</span></button>`;
+  }).join("");
 }
 
 function obterAtivosVisiveis() {
@@ -581,6 +616,7 @@ function tipoLogoAtivo(ativo) {
 
   if (categoria === "FII") return "fii";
   if (categoria === "ETF Brasil" || categoria === "ETF Internacional") return "etf";
+  if (categoria === "REIT") return "empresa";
   if (categoria === "BDR") return "bdr";
 
   return "empresa";
@@ -797,6 +833,7 @@ function fecharDrawerAtivo() {
 
 function atualizar() {
   tabela.innerHTML = "";
+  atualizarFiltrosRapidosCategoria();
 
   const totais = calcularTotais();
   const ativosVisiveis = obterAtivosVisiveis();
@@ -1685,15 +1722,72 @@ function configurarBrapi() {
 }
 
 function tickerConsultaBrapi(ativo) {
-  const tickerBase = String(ativo.t || "").trim().toUpperCase().replace(/\s+/g, "");
+  const tickerResolvido = String(ativo?.tickerMercado || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (tickerResolvido) return tickerResolvido;
 
-  // Alguns cadastros antigos de FII foram salvos sem o sufixo 11 (ex.: VRTA).
-  // Para a consulta na B3 tentamos o formato padrão, sem alterar o ticker exibido ao usuário.
-  if (ativo.c === "FII" && /^[A-Z]{4}$/.test(tickerBase)) {
-    return `${tickerBase}11`;
-  }
+  const tickerBase = String(ativo?.t || "").trim().toUpperCase().replace(/\s+/g, "");
+
+  if (ativo?.c === "FII" && /^[A-Z]{4}$/.test(tickerBase)) return `${tickerBase}11`;
+  if (ativo?.c === "ETF Brasil" && /^[A-Z]{4}$/.test(tickerBase)) return `${tickerBase}11`;
 
   return tickerBase;
+}
+
+function candidatosTickerBrapi(ativo) {
+  const resolvido = String(ativo?.tickerMercado || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (resolvido) return [resolvido];
+
+  const base = String(ativo?.t || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!base) return [];
+  if (/\d/.test(base)) return [base];
+
+  if (ativo?.c === "FII" || ativo?.c === "ETF Brasil") return [`${base}11`];
+  if (ativo?.c === "BDR") return [34, 35, 32, 33, 39].map((sufixo) => `${base}${sufixo}`);
+  if (ativo?.c === "Ação") return [3, 4, 5, 6, 7, 8, 11].map((sufixo) => `${base}${sufixo}`);
+
+  return [base];
+}
+
+function extrairPrecoBrapi(resultado) {
+  return numeroSeguro(resultado?.price ?? resultado?.regularMarketPrice ?? resultado?.data?.regularMarketPrice, NaN);
+}
+
+async function buscarCotacaoBrapiAtivo(ativo) {
+  const candidatos = candidatosTickerBrapi(ativo);
+  let ultimoErro = null;
+  const encontrados = [];
+  const tickerJaResolvido = Boolean(String(ativo?.tickerMercado || "").trim());
+  const tickerDigitadoCompleto = /\d/.test(String(ativo?.t || ""));
+  const precisaChecarAmbiguidade = !tickerJaResolvido && !tickerDigitadoCompleto && candidatos.length > 1;
+
+  for (const simbolo of candidatos) {
+    try {
+      const resultados = await buscarLoteBrapi([simbolo]);
+      const resultado = resultados.find((item) => {
+        const recebido = String(item?.symbol || item?.stock || "").trim().toUpperCase();
+        return recebido === simbolo;
+      }) || resultados[0];
+      const preco = extrairPrecoBrapi(resultado);
+      if (Number.isFinite(preco) && preco > 0) {
+        encontrados.push({
+          symbol: String(resultado?.symbol || resultado?.stock || simbolo).trim().toUpperCase(),
+          price: preco
+        });
+        if (!precisaChecarAmbiguidade) break;
+      }
+    } catch (erro) {
+      ultimoErro = erro;
+      const mensagem = String(erro?.message || "").toLowerCase();
+      const naoEncontrado = erro?.status === 404 || erro?.code === "QUOTE_NOT_FOUND" || mensagem.includes("nenhum resultado") || mensagem.includes("não encontrado") || mensagem.includes("nao encontrado");
+      if (naoEncontrado) continue;
+      throw erro;
+    }
+  }
+
+  if (encontrados.length === 1) return encontrados[0];
+  if (encontrados.length > 1) return { ambiguous: true, candidates: encontrados.map((item) => item.symbol) };
+  if (ultimoErro) throw ultimoErro;
+  return null;
 }
 
 function ativosElegiveisBrapi() {
@@ -1703,7 +1797,7 @@ function ativosElegiveisBrapi() {
 
 
 function ativosElegiveisFinnhub() {
-  const categoriasInternacionais = new Set(["Stock", "ETF Internacional"]);
+  const categoriasInternacionais = new Set(["Stock", "ETF Internacional", "REIT"]);
   return ativos.filter((ativo) => ativo.m === "USD" && categoriasInternacionais.has(ativo.c) && ativo.t);
 }
 
@@ -1838,31 +1932,26 @@ async function atualizarCotacoes() {
   let atualizadosInternacionais = 0;
   const falhas = [];
   const naoEncontrados = [];
+  const ambiguos = [];
 
   if (ativosB3.length) {
-    try {
-      const tickersConsulta = [...new Set(ativosB3.map(tickerConsultaBrapi).filter(Boolean))];
-      const resultados = [];
-      const TAMANHO_LOTE = 1;
-      for (let i = 0; i < tickersConsulta.length; i += TAMANHO_LOTE) {
-        resultados.push(...await buscarLoteBrapi(tickersConsulta.slice(i, i + TAMANHO_LOTE)));
-      }
-      const precos = new Map();
-      resultados.forEach((resultado) => {
-        const simbolo = String(resultado?.symbol || resultado?.stock || "").trim().toUpperCase();
-        const preco = numeroSeguro(resultado?.price ?? resultado?.regularMarketPrice ?? resultado?.data?.regularMarketPrice, NaN);
-        if (simbolo && Number.isFinite(preco) && preco > 0) precos.set(simbolo, preco);
-      });
-      ativosB3.forEach((ativo) => {
-        const novoPreco = precos.get(tickerConsultaBrapi(ativo));
-        if (Number.isFinite(novoPreco) && novoPreco > 0) {
-          ativo.cot = novoPreco;
+    for (const ativo of ativosB3) {
+      try {
+        const cotacaoB3 = await buscarCotacaoBrapiAtivo(ativo);
+        if (cotacaoB3?.ambiguous) {
+          ambiguos.push(`${ativo.t} → ${cotacaoB3.candidates.join(" / ")}`);
+        } else if (cotacaoB3 && Number.isFinite(cotacaoB3.price) && cotacaoB3.price > 0) {
+          ativo.cot = cotacaoB3.price;
+          ativo.tickerMercado = cotacaoB3.symbol;
           atualizadosB3 += 1;
-        } else naoEncontrados.push(ativo.t);
-      });
-    } catch (erro) {
-      console.error("Falha na BRAPI:", erro);
-      falhas.push(erro?.code === "BRAPI_TOKEN_MISSING" ? "BRAPI_TOKEN não configurado" : `BRAPI: ${erro?.message || "falha na consulta"}`);
+        } else {
+          naoEncontrados.push(ativo.t);
+        }
+      } catch (erro) {
+        console.error(`Falha na BRAPI para ${ativo.t}:`, erro);
+        const detalhe = erro?.code === "BRAPI_TOKEN_MISSING" ? "BRAPI_TOKEN não configurado" : `BRAPI: ${erro?.message || "falha na consulta"}`;
+        if (!falhas.includes(detalhe)) falhas.push(detalhe);
+      }
     }
   }
 
@@ -1894,6 +1983,7 @@ async function atualizarCotacoes() {
     quotesStatusTitle.textContent = `${totalAtualizados} ${totalAtualizados === 1 ? "cotação atualizada" : "cotações atualizadas"}`;
     const partes = [`Brasil: ${atualizadosB3}`, `Internacional: ${atualizadosInternacionais}`];
     if (naoEncontrados.length) partes.push(`sem cotação: ${naoEncontrados.join(", ")}`);
+    if (ambiguos.length) partes.push(`escolha o ticker: ${ambiguos.join("; ")}`);
     if (falhas.length) partes.push(`atenção: ${falhas.join("; ")}`);
     quotesStatusText.textContent = partes.join(" · ");
     quotesStatusTime.textContent = formatarDataHoraCotacoes(agora);
@@ -2005,6 +2095,12 @@ btnTema.addEventListener("click", () => {
 categoria.addEventListener("change", ajustarMoedaPeloTipo);
 buscaAtivo.addEventListener("input", atualizar);
 filtroCategoria.addEventListener("change", atualizar);
+categoryQuickFilters?.addEventListener("click", (evento) => {
+  const botao = evento.target.closest("button[data-category-filter]");
+  if (!botao) return;
+  filtroCategoria.value = botao.dataset.categoryFilter || "Todos";
+  atualizar();
+});
 somenteFavoritos.addEventListener("change", atualizar);
 arquivoImportacao.addEventListener("change", prepararImportacao);
 

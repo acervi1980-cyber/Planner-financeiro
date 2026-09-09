@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.9.12</title>
+  <title>Planner Financeiro · v1.9.13</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.9.12 · Cotações Brasil + EUA + UCITS</span>
+        <span>Versão 1.9.13 · Tickers B3 automáticos + filtros por categoria</span>
       </div>
     </aside>
 
@@ -166,6 +166,8 @@
           <span class="quotes-status-time" id="quotesStatusTime">Nunca verificado</span>
         </div>
 
+        <div class="category-quick-filters" id="categoryQuickFilters" aria-label="Filtrar carteira por categoria"></div>
+
         <div class="portfolio-tools">
           <div class="search-field">
             <label class="sr-only" for="buscaAtivo">Buscar ativo</label>
@@ -179,6 +181,7 @@
               <option value="FII">FIIs</option>
               <option value="Ação">Ações</option>
               <option value="Stock">Stocks</option>
+              <option value="REIT">REITs</option>
               <option value="ETF Brasil">ETF Brasil</option>
               <option value="ETF Internacional">ETF Internacional</option>
               <option value="BDR">BDRs</option>
@@ -471,6 +474,7 @@
             <option value="FII">FII</option>
             <option value="Ação">Ação</option>
             <option value="Stock">Stock</option>
+            <option value="REIT">REIT</option>
             <option value="ETF Brasil">ETF Brasil</option>
             <option value="ETF Internacional">ETF Internacional</option>
             <option value="BDR">BDR</option>
@@ -488,7 +492,8 @@
 
         <div class="field-group">
           <label for="tic">Ticker</label>
-          <input id="tic" placeholder="Ex.: KNRI11" autocomplete="off" required>
+          <input id="tic" placeholder="Ex.: CPFE ou KNRI11" autocomplete="off" required>
+          <small class="field-hint">Na B3, você pode informar só a raiz (ex.: CPFE). O Planner tenta identificar automaticamente o sufixo correto.</small>
         </div>
 
         <div class="field-group">
