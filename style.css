@@ -2159,3 +2159,50 @@ html[data-theme="dark"] .asset-logo.has-image {
 
 
 /* ===== Planner v1.9.7 — Migração do histórico inicial ===== */
+
+
+/* ===== Planner v1.9.14 — Escolha de ticker B3 ambíguo ===== */
+.ticker-choice-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.ticker-choice-help {
+  margin: 4px 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.ticker-choice-options {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.ticker-choice-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  text-align: left;
+}
+
+.ticker-choice-button:hover,
+.ticker-choice-button:focus-visible {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+.ticker-choice-button strong {
+  font-size: 15px;
+}
+
+.ticker-choice-button span {
+  color: var(--muted);
+  font-size: 11px;
+}

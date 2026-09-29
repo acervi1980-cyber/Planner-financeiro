@@ -12,6 +12,12 @@ const formAtivo = document.getElementById("formAtivo");
 const categoria = document.getElementById("cat");
 const moeda = document.getElementById("moeda");
 const ticker = document.getElementById("tic");
+const modalEscolhaTicker = document.getElementById("modalEscolhaTicker");
+const tickerChoiceSubtitle = document.getElementById("tickerChoiceSubtitle");
+const tickerChoiceOptions = document.getElementById("tickerChoiceOptions");
+const btnFecharEscolhaTicker = document.getElementById("btnFecharEscolhaTicker");
+const btnCancelarEscolhaTicker = document.getElementById("btnCancelarEscolhaTicker");
+
 const quantidade = document.getElementById("qtd");
 const precoMedio = document.getElementById("pm");
 const labelPrecoMedio = document.getElementById("labelPrecoMedio");
@@ -1752,6 +1758,49 @@ function extrairPrecoBrapi(resultado) {
   return numeroSeguro(resultado?.price ?? resultado?.regularMarketPrice ?? resultado?.data?.regularMarketPrice, NaN);
 }
 
+
+function escolherTickerB3(ativo, candidatos) {
+  return new Promise((resolve) => {
+    if (!modalEscolhaTicker || !tickerChoiceOptions) {
+      resolve(null);
+      return;
+    }
+
+    const opcoes = [...new Set((candidatos || []).map((item) => String(item || "").trim().toUpperCase()).filter(Boolean))];
+    if (!opcoes.length) {
+      resolve(null);
+      return;
+    }
+
+    tickerChoiceSubtitle.textContent = `${String(ativo?.t || "Ativo").toUpperCase()} possui ${opcoes.length} classes disponíveis na B3.`;
+    tickerChoiceOptions.innerHTML = "";
+
+    let finalizado = false;
+    const concluir = (valor) => {
+      if (finalizado) return;
+      finalizado = true;
+      modalEscolhaTicker.removeEventListener("close", aoFechar);
+      if (modalEscolhaTicker.open) modalEscolhaTicker.close();
+      resolve(valor);
+    };
+    const aoFechar = () => concluir(null);
+
+    opcoes.forEach((simbolo) => {
+      const botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "ticker-choice-button";
+      botao.innerHTML = `<strong>${escaparHtml(simbolo)}</strong><span>Usar este ticker</span>`;
+      botao.addEventListener("click", () => concluir(simbolo), { once: true });
+      tickerChoiceOptions.appendChild(botao);
+    });
+
+    btnFecharEscolhaTicker.onclick = () => concluir(null);
+    btnCancelarEscolhaTicker.onclick = () => concluir(null);
+    modalEscolhaTicker.addEventListener("close", aoFechar, { once: true });
+    modalEscolhaTicker.showModal();
+  });
+}
+
 async function buscarCotacaoBrapiAtivo(ativo) {
   const candidatos = candidatosTickerBrapi(ativo);
   let ultimoErro = null;
@@ -1939,7 +1988,20 @@ async function atualizarCotacoes() {
       try {
         const cotacaoB3 = await buscarCotacaoBrapiAtivo(ativo);
         if (cotacaoB3?.ambiguous) {
-          ambiguos.push(`${ativo.t} → ${cotacaoB3.candidates.join(" / ")}`);
+          const escolhido = await escolherTickerB3(ativo, cotacaoB3.candidates);
+          if (escolhido) {
+            const escolhidoCotacao = await buscarCotacaoBrapiAtivo({ ...ativo, tickerMercado: escolhido });
+            if (escolhidoCotacao && Number.isFinite(escolhidoCotacao.price) && escolhidoCotacao.price > 0) {
+              ativo.tickerMercado = escolhido;
+              ativo.t = escolhido;
+              ativo.cot = escolhidoCotacao.price;
+              atualizadosB3 += 1;
+            } else {
+              naoEncontrados.push(escolhido);
+            }
+          } else {
+            ambiguos.push(`${ativo.t} → ${cotacaoB3.candidates.join(" / ")}`);
+          }
         } else if (cotacaoB3 && Number.isFinite(cotacaoB3.price) && cotacaoB3.price > 0) {
           ativo.cot = cotacaoB3.price;
           ativo.tickerMercado = cotacaoB3.symbol;

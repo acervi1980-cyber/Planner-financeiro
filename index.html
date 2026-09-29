@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.9.13</title>
+  <title>Planner Financeiro · v1.9.14</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.9.13 · Tickers B3 automáticos + filtros por categoria</span>
+        <span>Versão 1.9.14 · Escolha inteligente de ticker B3</span>
       </div>
     </aside>
 
@@ -674,6 +674,22 @@
     <div class="dialog-actions">
       <button type="button" id="btnConfirmarImportacao">Importar</button>
       <button type="button" class="secondary" id="btnCancelarImportacao">Cancelar</button>
+    </div>
+  </dialog>
+
+
+  <dialog id="modalEscolhaTicker" class="ticker-choice-dialog">
+    <div class="dialog-heading">
+      <div>
+        <h3>Escolha o ticker correto</h3>
+        <small id="tickerChoiceSubtitle">Encontramos mais de uma classe para este ativo.</small>
+      </div>
+      <button type="button" class="icon-button close-button" id="btnFecharEscolhaTicker" aria-label="Fechar">×</button>
+    </div>
+    <p class="ticker-choice-help">Selecione a classe que você possui. O Planner vai salvar a escolha neste ativo e usar esse ticker automaticamente nas próximas atualizações.</p>
+    <div class="ticker-choice-options" id="tickerChoiceOptions"></div>
+    <div class="dialog-actions">
+      <button type="button" class="secondary" id="btnCancelarEscolhaTicker">Cancelar</button>
     </div>
   </dialog>
 
