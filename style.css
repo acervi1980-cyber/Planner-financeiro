@@ -2206,3 +2206,23 @@ html[data-theme="dark"] .asset-logo.has-image {
   color: var(--muted);
   font-size: 11px;
 }
+
+
+/* ===== Planner v1.9.15 — Dividendos reais ===== */
+.dividends-panel { margin-top: 20px; }
+.dividends-status {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--green-soft);
+}
+.dividends-status strong { font-size: 13px; }
+.dividends-status span { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.dividends-status.is-error {
+  border-color: color-mix(in srgb, var(--loss) 38%, var(--line));
+  background: color-mix(in srgb, var(--loss-soft) 64%, var(--card));
+}
+.dividends-summary { margin: 0 0 16px; }

@@ -49,6 +49,7 @@ const btnConfigurarBrapi = document.getElementById("btnConfigurarBrapi");
 const QUOTES_STATUS_KEY = "planner-quotes-status-v2";
 const BRAPI_PROXY_URL = "/.netlify/functions/brapi-quotes";
 const FINNHUB_PROXY_URL = "/.netlify/functions/finnhub-quote";
+const BRAPI_DIVIDENDS_PROXY_URL = "/.netlify/functions/brapi-dividends";
 const BRAPI_AUTO_INTERVAL_MS = 15 * 60 * 1000;
 const BRAPI_AUTO_FRESHNESS_MS = 5 * 60 * 1000;
 let atualizacaoAutomaticaEmAndamento = false;
@@ -96,6 +97,17 @@ const percentualMeta = document.getElementById("percentualMeta");
 const tabelaReinvestimento = document.getElementById("tabelaReinvestimento");
 const tabelaRendaAtivos = document.getElementById("tabelaRendaAtivos");
 const rendaVazia = document.getElementById("rendaVazia");
+const btnAtualizarDividendos = document.getElementById("btnAtualizarDividendos");
+const dividendsStatus = document.getElementById("dividendsStatus");
+const dividendsStatusTitle = document.getElementById("dividendsStatusTitle");
+const dividendsStatusText = document.getElementById("dividendsStatusText");
+const dividendosAnoAtual = document.getElementById("dividendosAnoAtual");
+const dividendos12Meses = document.getElementById("dividendos12Meses");
+const dividendosTotal = document.getElementById("dividendosTotal");
+const dividendosTotalDetalhe = document.getElementById("dividendosTotalDetalhe");
+const tabelaDividendosReais = document.getElementById("tabelaDividendosReais");
+const dividendosVazios = document.getElementById("dividendosVazios");
+
 
 const assetDrawer = document.getElementById("assetDrawer");
 const assetDrawerBackdrop = document.getElementById("assetDrawerBackdrop");
@@ -228,7 +240,17 @@ function normalizarAtivo(ativo) {
     data: validarData(ativo.data ?? ativo.dataCompra ?? ""),
     corretora: String(ativo.corretora ?? "").trim(),
     favorito: Boolean(ativo.favorito),
-    movimentacoes
+    movimentacoes,
+    dividendosImportados: Array.isArray(ativo.dividendosImportados)
+      ? ativo.dividendosImportados.map((evento) => ({
+          symbol: String(evento.symbol || ativo.t || "").toUpperCase(),
+          label: String(evento.label || "DIVIDENDO"),
+          rate: Math.max(0, numeroSeguro(evento.rate)),
+          paymentDate: validarData(String(evento.paymentDate || "").slice(0, 10)),
+          lastDatePrior: validarData(String(evento.lastDatePrior || "").slice(0, 10)),
+          exDate: validarData(String(evento.exDate || "").slice(0, 10))
+        })).filter((evento) => evento.rate > 0)
+      : []
   };
 }
 
@@ -1359,6 +1381,7 @@ function atualizarRendaPassiva() {
   renderizarGraficoProjecao(dados);
   renderizarSimulacaoReinvestimento(dados);
   renderizarTabelaRendaAtivos();
+  renderizarDividendosReais();
 }
 
 function adicionarMes(data, quantidadeMeses) {
@@ -1483,6 +1506,151 @@ function renderizarTabelaRendaAtivos() {
     `;
   }).join("");
 }
+
+
+function quantidadeNaData(ativo, dataReferencia) {
+  const data = String(dataReferencia || "").slice(0, 10);
+  if (!data) return numeroSeguro(ativo.q);
+
+  const movimentos = [...(ativo.movimentacoes || [])]
+    .filter((mov) => mov.data && mov.data <= data && (mov.tipo === "compra" || mov.tipo === "venda"))
+    .sort((a, b) => String(a.data).localeCompare(String(b.data)));
+
+  if (!movimentos.length) {
+    return ativo.data && ativo.data <= data ? numeroSeguro(ativo.q) : 0;
+  }
+
+  return Math.max(0, movimentos.reduce((qtd, mov) => {
+    return mov.tipo === "venda"
+      ? qtd - numeroSeguro(mov.q)
+      : qtd + numeroSeguro(mov.q);
+  }, 0));
+}
+
+function eventosDividendosCarteira() {
+  return ativos.flatMap((ativo) =>
+    (ativo.dividendosImportados || []).map((evento) => {
+      const dataDireito = evento.lastDatePrior || evento.exDate || evento.paymentDate;
+      const qtd = quantidadeNaData(ativo, dataDireito);
+      return {
+        ...evento,
+        ativoId: ativo.id,
+        ticker: ativo.t,
+        moeda: ativo.m,
+        quantidadeDireito: qtd,
+        recebido: qtd * numeroSeguro(evento.rate)
+      };
+    })
+  ).filter((evento) => evento.paymentDate);
+}
+
+function renderizarDividendosReais() {
+  if (!tabelaDividendosReais) return;
+  const eventos = eventosDividendosCarteira()
+    .sort((a, b) => String(b.paymentDate).localeCompare(String(a.paymentDate)));
+
+  dividendosVazios.hidden = eventos.length > 0;
+  tabelaDividendosReais.innerHTML = eventos.map((evento) => `
+    <tr>
+      <td>${formatarData(evento.paymentDate)}</td>
+      <td><strong>${escaparHtml(evento.ticker)}</strong></td>
+      <td>${escaparHtml(evento.label || "DIVIDENDO")}</td>
+      <td>${formatarMoeda(evento.rate, evento.moeda)}</td>
+      <td>${numeroSeguro(evento.quantidadeDireito).toLocaleString("pt-BR", { maximumFractionDigits: 6 })}</td>
+      <td><strong>${formatarMoeda(evento.recebido, evento.moeda)}</strong></td>
+    </tr>
+  `).join("");
+
+  const hoje = new Date();
+  const anoAtual = hoje.getFullYear();
+  const inicio12m = new Date(hoje);
+  inicio12m.setFullYear(inicio12m.getFullYear() - 1);
+  const inicio12mIso = inicio12m.toISOString().slice(0, 10);
+
+  const eventosBRL = eventos.filter((evento) => evento.moeda === "BRL");
+  const totalAno = eventosBRL
+    .filter((evento) => Number(evento.paymentDate.slice(0, 4)) === anoAtual)
+    .reduce((soma, evento) => soma + evento.recebido, 0);
+  const total12m = eventosBRL
+    .filter((evento) => evento.paymentDate >= inicio12mIso)
+    .reduce((soma, evento) => soma + evento.recebido, 0);
+  const total = eventosBRL.reduce((soma, evento) => soma + evento.recebido, 0);
+
+  dividendosAnoAtual.textContent = formatarMoeda(totalAno, "BRL");
+  dividendos12Meses.textContent = formatarMoeda(total12m, "BRL");
+  dividendosTotal.textContent = formatarMoeda(total, "BRL");
+  dividendosTotalDetalhe.textContent = `${eventosBRL.length} evento(s) importado(s)`;
+}
+
+async function buscarDividendosBrapi(ativo) {
+  const symbol = String(ativo.tickerMercado || ativo.t || "").trim().toUpperCase();
+  const kind = ativo.c === "FII" ? "fii" : "stock";
+  const resposta = await fetch(`${BRAPI_DIVIDENDS_PROXY_URL}?symbol=${encodeURIComponent(symbol)}&kind=${kind}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store"
+  });
+  const dados = await resposta.json().catch(() => ({}));
+  if (!resposta.ok) {
+    const erro = new Error(dados?.error || dados?.message || `BRAPI dividendos: HTTP ${resposta.status}`);
+    erro.status = resposta.status;
+    throw erro;
+  }
+  return Array.isArray(dados.dividends) ? dados.dividends : [];
+}
+
+async function atualizarDividendosAutomaticos() {
+  const elegiveis = ativos.filter((ativo) =>
+    ativo.m === "BRL" && ["Ação", "FII"].includes(ativo.c) && /\d/.test(String(ativo.tickerMercado || ativo.t))
+  );
+
+  if (!elegiveis.length) {
+    mostrarToast("Não há ações ou FIIs brasileiros com ticker completo para consultar.", "error");
+    return;
+  }
+
+  btnAtualizarDividendos.disabled = true;
+  dividendsStatus.classList.remove("is-error");
+  dividendsStatusTitle.textContent = "Consultando dividendos...";
+  dividendsStatusText.textContent = `Verificando ${elegiveis.length} ativo(s) brasileiro(s).`;
+
+  let atualizados = 0;
+  const erros = [];
+
+  for (const ativo of elegiveis) {
+    try {
+      const eventos = await buscarDividendosBrapi(ativo);
+      ativo.dividendosImportados = eventos.map((evento) => ({
+        symbol: String(evento.symbol || ativo.t).toUpperCase(),
+        label: String(evento.label || "DIVIDENDO"),
+        rate: Math.max(0, numeroSeguro(evento.rate)),
+        paymentDate: validarData(String(evento.paymentDate || "").slice(0, 10)),
+        lastDatePrior: validarData(String(evento.lastDatePrior || "").slice(0, 10)),
+        exDate: validarData(String(evento.exDate || "").slice(0, 10))
+      })).filter((evento) => evento.rate > 0 && evento.paymentDate);
+      atualizados += 1;
+    } catch (erro) {
+      erros.push(`${ativo.t}: ${erro.message}`);
+      if (erro.status === 403) break;
+    }
+  }
+
+  salvarLocalmente();
+  renderizarDividendosReais();
+  btnAtualizarDividendos.disabled = false;
+
+  if (erros.length) {
+    dividendsStatus.classList.add("is-error");
+    dividendsStatusTitle.textContent = atualizados ? `${atualizados} ativo(s) com dividendos atualizados` : "Dividendos não disponíveis";
+    dividendsStatusText.textContent = erros[0].includes("403")
+      ? "A BRAPI recusou o endpoint de dividendos para a chave atual. Esse recurso depende do plano contratado; seus dados existentes foram preservados."
+      : erros.slice(0, 2).join(" · ");
+  } else {
+    dividendsStatusTitle.textContent = `${atualizados} ativo(s) com dividendos atualizados`;
+    dividendsStatusText.textContent = "Valores estimados usando sua quantidade registrada na data-com de cada evento.";
+  }
+}
+
 
 function rotuloTipoMovimentacao(tipo) {
   if (tipo === "venda") return "Venda";
@@ -2310,16 +2478,17 @@ formMovimentacao.addEventListener("submit", (evento) => {
   mostrarToast(`${rotuloTipoMovimentacao(tipo)} de ${ativo.t} registrada.`);
 });
 
-formAtivo.addEventListener("submit", (evento) => {
+formAtivo.addEventListener("submit", async (evento) => {
   evento.preventDefault();
 
-  const tickerNormalizado = ticker.value.trim().toUpperCase();
+  let tickerNormalizado = ticker.value.trim().toUpperCase();
   const quantidadeInformada = numeroSeguro(quantidade.value);
   const precoInformado = numeroSeguro(precoMedio.value);
   const cotacaoInformada = numeroSeguro(cotacao.value);
   const dadosBase = {
     id: ativoEmEdicaoId || criarId(),
     t: tickerNormalizado,
+    tickerMercado: "",
     c: categoria.value,
     m: moeda.value,
     q: quantidadeInformada,
@@ -2331,34 +2500,86 @@ formAtivo.addEventListener("submit", (evento) => {
     favorito: favorito.checked
   };
 
-  if (
-    !dadosBase.t ||
-    dadosBase.q <= 0 ||
-    dadosBase.p < 0 ||
-    dadosBase.cot < 0 ||
-    dadosBase.dy < 0
-  ) {
+  if (!dadosBase.t || dadosBase.q <= 0 || dadosBase.p < 0 || dadosBase.cot < 0 || dadosBase.dy < 0) {
     alert("Preencha todos os campos obrigatórios com valores válidos.");
     return;
+  }
+
+  const categoriasB3 = new Set(["Ação", "FII", "ETF Brasil", "BDR"]);
+  const precisaResolverTicker =
+    !ativoEmEdicaoId &&
+    dadosBase.m === "BRL" &&
+    categoriasB3.has(dadosBase.c) &&
+    !/\d/.test(dadosBase.t);
+
+  if (precisaResolverTicker) {
+    const btnSalvar = document.getElementById("btnSalvar");
+    const textoAnterior = btnSalvar.textContent;
+    btnSalvar.disabled = true;
+    btnSalvar.textContent = "Identificando ticker...";
+
+    try {
+      const resultado = await buscarCotacaoBrapiAtivo(dadosBase);
+      let escolhido = null;
+
+      if (resultado?.ambiguous) {
+        escolhido = await escolherTickerB3(dadosBase, resultado.candidates);
+        if (!escolhido) {
+          btnSalvar.disabled = false;
+          btnSalvar.textContent = textoAnterior;
+          mostrarToast("Escolha uma classe para concluir o cadastro.", "error");
+          return;
+        }
+      } else if (resultado?.symbol) {
+        escolhido = resultado.symbol;
+      }
+
+      if (escolhido) {
+        dadosBase.t = escolhido;
+        dadosBase.tickerMercado = escolhido;
+        ticker.value = escolhido;
+        if (dadosBase.cot <= 0) {
+          const cotacaoEscolhida = resultado?.symbol === escolhido
+            ? resultado
+            : await buscarCotacaoBrapiAtivo({ ...dadosBase, t: escolhido, tickerMercado: escolhido });
+          if (cotacaoEscolhida?.price > 0) dadosBase.cot = cotacaoEscolhida.price;
+        }
+      } else {
+        mostrarToast(`Não foi possível identificar automaticamente ${dadosBase.t}.`, "error");
+        btnSalvar.disabled = false;
+        btnSalvar.textContent = textoAnterior;
+        return;
+      }
+    } catch (erro) {
+      console.error("Falha ao identificar ticker no cadastro:", erro);
+      mostrarToast(`Não foi possível validar ${dadosBase.t} na B3.`, "error");
+      btnSalvar.disabled = false;
+      btnSalvar.textContent = textoAnterior;
+      return;
+    }
+
+    btnSalvar.disabled = false;
+    btnSalvar.textContent = textoAnterior;
   }
 
   let mensagem = "";
 
   if (ativoEmEdicaoId) {
     const indice = ativos.findIndex((ativo) => ativo.id === ativoEmEdicaoId);
-
     if (indice >= 0) {
       const atual = ativos[indice];
       ativos[indice] = {
         ...dadosBase,
+        tickerMercado: dadosBase.tickerMercado || atual.tickerMercado || "",
         cot: dadosBase.cot > 0 ? dadosBase.cot : atual.cot,
-        movimentacoes: [...(atual.movimentacoes || [])]
+        movimentacoes: [...(atual.movimentacoes || [])],
+        dividendosImportados: [...(atual.dividendosImportados || [])]
       };
       mensagem = `${dadosBase.t} foi atualizado.`;
     }
   } else {
-    const existente = ativos.find(
-      (ativo) => ativo.t === dadosBase.t && ativo.m === dadosBase.m
+    const existente = ativos.find((ativo) =>
+      (ativo.t === dadosBase.t || ativo.tickerMercado === dadosBase.t) && ativo.m === dadosBase.m
     );
 
     const novaMovimentacao = {
@@ -2377,26 +2598,24 @@ formAtivo.addEventListener("submit", (evento) => {
       const quantidadeTotal = quantidadeAnterior + dadosBase.q;
 
       existente.q = quantidadeTotal;
-      existente.p = quantidadeTotal > 0
-        ? (custoAnterior + custoNovaCompra) / quantidadeTotal
-        : 0;
+      existente.p = quantidadeTotal > 0 ? (custoAnterior + custoNovaCompra) / quantidadeTotal : 0;
       existente.cot = dadosBase.cot > 0 ? dadosBase.cot : existente.cot;
       existente.dy = dadosBase.dy > 0 ? dadosBase.dy : existente.dy;
       existente.data = dadosBase.data || existente.data;
       existente.corretora = dadosBase.corretora || existente.corretora;
       existente.favorito = existente.favorito || dadosBase.favorito;
       existente.c = dadosBase.c || existente.c;
-      existente.movimentacoes = [
-        ...(existente.movimentacoes || []),
-        novaMovimentacao
-      ];
+      existente.tickerMercado = dadosBase.tickerMercado || existente.tickerMercado || dadosBase.t;
+      existente.movimentacoes = [...(existente.movimentacoes || []), novaMovimentacao];
 
       mensagem = `${dadosBase.t}: compra consolidada. Nova quantidade ${quantidadeTotal} e preço médio ${formatarMoeda(existente.p, existente.m)}.`;
     } else {
       const novoAtivo = {
         ...dadosBase,
+        tickerMercado: dadosBase.tickerMercado || dadosBase.t,
         cot: dadosBase.cot > 0 ? dadosBase.cot : dadosBase.p,
-        movimentacoes: [novaMovimentacao]
+        movimentacoes: [novaMovimentacao],
+        dividendosImportados: []
       };
       ativos.push(novoAtivo);
       mensagem = `${dadosBase.t} foi adicionado à carteira.`;
@@ -2407,6 +2626,8 @@ formAtivo.addEventListener("submit", (evento) => {
   atualizar();
   mostrarToast(mensagem);
 });
+
+btnAtualizarDividendos?.addEventListener("click", atualizarDividendosAutomaticos);
 
 document.getElementById("btnConfirmarExclusao").addEventListener("click", () => {
   if (!ativoParaExcluirId) return;

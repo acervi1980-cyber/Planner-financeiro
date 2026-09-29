@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.9.14</title>
+  <title>Planner Financeiro · v1.9.15</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -24,7 +24,7 @@
         <a class="active" href="#dashboard" data-view="dashboard">Dashboard</a>
         <a href="#carteira" data-scroll="carteira">Carteira</a>
         <a href="#renda-passiva" data-view="renda-passiva">Renda Passiva</a>
-        <a href="#" aria-disabled="true">Dividendos</a>
+        <a href="#dividendos" data-view="renda-passiva" data-dividendos-link="true">Dividendos</a>
         <a href="#movimentacoes" data-view="movimentacoes">Movimentações</a>
         <a href="#" aria-disabled="true">Metas</a>
         <a href="#" aria-disabled="true">Análises</a>
@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.9.14 · Escolha inteligente de ticker B3</span>
+        <span>Versão 1.9.15 · Ticker B3 no cadastro + dividendos reais</span>
       </div>
     </aside>
 
@@ -373,6 +373,63 @@
             </div>
           </article>
         </section>
+
+        <section class="panel dividends-panel" id="dividendosReais">
+          <div class="panel-header portfolio-header">
+            <div>
+              <h3>Dividendos e proventos</h3>
+              <small>Eventos reais importados da B3 e valores estimados para a sua posição histórica</small>
+            </div>
+            <div class="data-actions">
+              <button type="button" class="quote-update-button compact-button" id="btnAtualizarDividendos">↻ Atualizar dividendos</button>
+            </div>
+          </div>
+
+          <div class="dividends-status" id="dividendsStatus" aria-live="polite">
+            <strong id="dividendsStatusTitle">Dividendos prontos para consulta</strong>
+            <span id="dividendsStatusText">O Planner usa a BRAPI para ações e FIIs brasileiros. A disponibilidade depende do plano da sua chave BRAPI.</span>
+          </div>
+
+          <section class="passive-summary dividends-summary" aria-label="Resumo de dividendos recebidos">
+            <article class="card passive-card">
+              <small>Recebido em 2026</small>
+              <h2 id="dividendosAnoAtual">R$ 0,00</h2>
+              <span class="card-detail">Estimativa pelos eventos e sua quantidade na data-com</span>
+            </article>
+            <article class="card passive-card">
+              <small>Últimos 12 meses</small>
+              <h2 id="dividendos12Meses">R$ 0,00</h2>
+              <span class="card-detail">Dividendos, JCP e rendimentos importados</span>
+            </article>
+            <article class="card passive-card">
+              <small>Total importado</small>
+              <h2 id="dividendosTotal">R$ 0,00</h2>
+              <span class="card-detail" id="dividendosTotalDetalhe">Nenhum evento importado</span>
+            </article>
+          </section>
+
+          <div class="table-wrapper compact-table-wrapper">
+            <table class="passive-table">
+              <thead>
+                <tr>
+                  <th>Pagamento</th>
+                  <th>Ativo</th>
+                  <th>Tipo</th>
+                  <th>Valor por ação/cota</th>
+                  <th>Qtd. na data-com</th>
+                  <th>Recebido estimado</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaDividendosReais"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="dividendosVazios">
+            <strong>Nenhum provento importado ainda.</strong>
+            <span>Clique em “Atualizar dividendos” para consultar os ativos brasileiros da carteira.</span>
+          </div>
+          <p class="calculation-note">O valor recebido é calculado pela quantidade registrada no Planner na data-com do evento. Se o histórico de compras/vendas estiver incompleto, o valor pode diferir do extrato da corretora.</p>
+        </section>
+
       </section>
 
       <section class="app-view" id="viewMovimentacoes" hidden>
