@@ -49,7 +49,7 @@ const btnConfigurarBrapi = document.getElementById("btnConfigurarBrapi");
 const QUOTES_STATUS_KEY = "planner-quotes-status-v2";
 const BRAPI_PROXY_URL = "/.netlify/functions/brapi-quotes";
 const FINNHUB_PROXY_URL = "/.netlify/functions/finnhub-quote";
-const BRAPI_DIVIDENDS_PROXY_URL = "/.netlify/functions/brapi-dividends";
+const DADOSB3_DIVIDENDS_PROXY_URL = "/.netlify/functions/dadosb3-dividends";
 const BRAPI_AUTO_INTERVAL_MS = 15 * 60 * 1000;
 const BRAPI_AUTO_FRESHNESS_MS = 5 * 60 * 1000;
 let atualizacaoAutomaticaEmAndamento = false;
@@ -248,8 +248,9 @@ function normalizarAtivo(ativo) {
           rate: Math.max(0, numeroSeguro(evento.rate)),
           paymentDate: validarData(String(evento.paymentDate || "").slice(0, 10)),
           lastDatePrior: validarData(String(evento.lastDatePrior || "").slice(0, 10)),
-          exDate: validarData(String(evento.exDate || "").slice(0, 10))
-        })).filter((evento) => evento.rate > 0)
+          exDate: validarData(String(evento.exDate || "").slice(0, 10)),
+          source: String(evento.source || "")
+        })).filter((evento) => evento.rate > 0 && (evento.lastDatePrior || evento.paymentDate))
       : []
   };
 }
@@ -1528,80 +1529,103 @@ function quantidadeNaData(ativo, dataReferencia) {
 }
 
 function eventosDividendosCarteira() {
+  const hojeIso = new Date().toISOString().slice(0, 10);
+
   return ativos.flatMap((ativo) =>
     (ativo.dividendosImportados || []).map((evento) => {
       const dataDireito = evento.lastDatePrior || evento.exDate || evento.paymentDate;
       const qtd = quantidadeNaData(ativo, dataDireito);
+      const recebido = qtd * numeroSeguro(evento.rate);
+      const pago = Boolean(evento.paymentDate && evento.paymentDate <= hojeIso);
+
       return {
         ...evento,
         ativoId: ativo.id,
         ticker: ativo.t,
         moeda: ativo.m,
         quantidadeDireito: qtd,
-        recebido: qtd * numeroSeguro(evento.rate)
+        recebido,
+        pago
       };
     })
-  ).filter((evento) => evento.paymentDate);
+  ).filter((evento) => evento.lastDatePrior || evento.paymentDate);
 }
 
 function renderizarDividendosReais() {
   if (!tabelaDividendosReais) return;
+
   const eventos = eventosDividendosCarteira()
-    .sort((a, b) => String(b.paymentDate).localeCompare(String(a.paymentDate)));
+    .sort((a, b) => {
+      const dataA = a.paymentDate || a.lastDatePrior || "";
+      const dataB = b.paymentDate || b.lastDatePrior || "";
+      return String(dataB).localeCompare(String(dataA));
+    });
 
   dividendosVazios.hidden = eventos.length > 0;
   tabelaDividendosReais.innerHTML = eventos.map((evento) => `
     <tr>
-      <td>${formatarData(evento.paymentDate)}</td>
+      <td>${evento.paymentDate ? formatarData(evento.paymentDate) : "—"}</td>
       <td><strong>${escaparHtml(evento.ticker)}</strong></td>
       <td>${escaparHtml(evento.label || "DIVIDENDO")}</td>
       <td>${formatarMoeda(evento.rate, evento.moeda)}</td>
       <td>${numeroSeguro(evento.quantidadeDireito).toLocaleString("pt-BR", { maximumFractionDigits: 6 })}</td>
-      <td><strong>${formatarMoeda(evento.recebido, evento.moeda)}</strong></td>
+      <td><strong>${evento.pago ? formatarMoeda(evento.recebido, evento.moeda) : "—"}</strong></td>
     </tr>
   `).join("");
 
   const hoje = new Date();
+  const hojeIso = hoje.toISOString().slice(0, 10);
   const anoAtual = hoje.getFullYear();
   const inicio12m = new Date(hoje);
   inicio12m.setFullYear(inicio12m.getFullYear() - 1);
   const inicio12mIso = inicio12m.toISOString().slice(0, 10);
 
-  const eventosBRL = eventos.filter((evento) => evento.moeda === "BRL");
-  const totalAno = eventosBRL
+  const pagosBRL = eventos.filter((evento) =>
+    evento.moeda === "BRL" &&
+    evento.paymentDate &&
+    evento.paymentDate <= hojeIso
+  );
+
+  const totalAno = pagosBRL
     .filter((evento) => Number(evento.paymentDate.slice(0, 4)) === anoAtual)
     .reduce((soma, evento) => soma + evento.recebido, 0);
-  const total12m = eventosBRL
+
+  const total12m = pagosBRL
     .filter((evento) => evento.paymentDate >= inicio12mIso)
     .reduce((soma, evento) => soma + evento.recebido, 0);
-  const total = eventosBRL.reduce((soma, evento) => soma + evento.recebido, 0);
+
+  const total = pagosBRL.reduce((soma, evento) => soma + evento.recebido, 0);
 
   dividendosAnoAtual.textContent = formatarMoeda(totalAno, "BRL");
   dividendos12Meses.textContent = formatarMoeda(total12m, "BRL");
   dividendosTotal.textContent = formatarMoeda(total, "BRL");
-  dividendosTotalDetalhe.textContent = `${eventosBRL.length} evento(s) importado(s)`;
+  dividendosTotalDetalhe.textContent = `${eventos.length} evento(s) importado(s) · ${pagosBRL.length} pagamento(s) contabilizado(s)`;
 }
 
-async function buscarDividendosBrapi(ativo) {
+async function buscarDividendosDadosB3(ativo) {
   const symbol = String(ativo.tickerMercado || ativo.t || "").trim().toUpperCase();
   const kind = ativo.c === "FII" ? "fii" : "stock";
-  const resposta = await fetch(`${BRAPI_DIVIDENDS_PROXY_URL}?symbol=${encodeURIComponent(symbol)}&kind=${kind}`, {
+  const resposta = await fetch(`${DADOSB3_DIVIDENDS_PROXY_URL}?symbol=${encodeURIComponent(symbol)}&kind=${kind}`, {
     method: "GET",
     headers: { Accept: "application/json" },
     cache: "no-store"
   });
+
   const dados = await resposta.json().catch(() => ({}));
   if (!resposta.ok) {
-    const erro = new Error(dados?.error || dados?.message || `BRAPI dividendos: HTTP ${resposta.status}`);
+    const erro = new Error(dados?.error || dados?.message || `Dados B3: HTTP ${resposta.status}`);
     erro.status = resposta.status;
     throw erro;
   }
+
   return Array.isArray(dados.dividends) ? dados.dividends : [];
 }
 
 async function atualizarDividendosAutomaticos() {
   const elegiveis = ativos.filter((ativo) =>
-    ativo.m === "BRL" && ["Ação", "FII"].includes(ativo.c) && /\d/.test(String(ativo.tickerMercado || ativo.t))
+    ativo.m === "BRL" &&
+    ["Ação", "FII"].includes(ativo.c) &&
+    /\d/.test(String(ativo.tickerMercado || ativo.t))
   );
 
   if (!elegiveis.length) {
@@ -1612,26 +1636,33 @@ async function atualizarDividendosAutomaticos() {
   btnAtualizarDividendos.disabled = true;
   dividendsStatus.classList.remove("is-error");
   dividendsStatusTitle.textContent = "Consultando dividendos...";
-  dividendsStatusText.textContent = `Verificando ${elegiveis.length} ativo(s) brasileiro(s).`;
+  dividendsStatusText.textContent = `Dados B3: verificando ${elegiveis.length} ativo(s) brasileiro(s).`;
 
   let atualizados = 0;
+  let eventosImportados = 0;
   const erros = [];
 
   for (const ativo of elegiveis) {
     try {
-      const eventos = await buscarDividendosBrapi(ativo);
+      const eventos = await buscarDividendosDadosB3(ativo);
+
       ativo.dividendosImportados = eventos.map((evento) => ({
         symbol: String(evento.symbol || ativo.t).toUpperCase(),
-        label: String(evento.label || "DIVIDENDO"),
+        label: String(evento.label || "DIVIDENDO").toUpperCase(),
         rate: Math.max(0, numeroSeguro(evento.rate)),
         paymentDate: validarData(String(evento.paymentDate || "").slice(0, 10)),
         lastDatePrior: validarData(String(evento.lastDatePrior || "").slice(0, 10)),
-        exDate: validarData(String(evento.exDate || "").slice(0, 10))
-      })).filter((evento) => evento.rate > 0 && evento.paymentDate);
+        exDate: validarData(String(evento.exDate || "").slice(0, 10)),
+        source: "Dados B3"
+      })).filter((evento) =>
+        evento.rate > 0 && (evento.lastDatePrior || evento.paymentDate)
+      );
+
+      eventosImportados += ativo.dividendosImportados.length;
       atualizados += 1;
     } catch (erro) {
       erros.push(`${ativo.t}: ${erro.message}`);
-      if (erro.status === 403) break;
+      if (erro.status === 401 || erro.status === 403 || erro.status === 429) break;
     }
   }
 
@@ -1641,16 +1672,22 @@ async function atualizarDividendosAutomaticos() {
 
   if (erros.length) {
     dividendsStatus.classList.add("is-error");
-    dividendsStatusTitle.textContent = atualizados ? `${atualizados} ativo(s) com dividendos atualizados` : "Dividendos não disponíveis";
-    dividendsStatusText.textContent = erros[0].includes("403")
-      ? "A BRAPI recusou o endpoint de dividendos para a chave atual. Esse recurso depende do plano contratado; seus dados existentes foram preservados."
-      : erros.slice(0, 2).join(" · ");
+    dividendsStatusTitle.textContent = atualizados
+      ? `${atualizados} ativo(s) atualizados com ressalvas`
+      : "Não foi possível importar dividendos";
+
+    if (erros[0].includes("429")) {
+      dividendsStatusText.textContent = "O limite diário do Dados B3 foi atingido. Tente novamente amanhã; os dados já importados foram preservados.";
+    } else if (erros[0].includes("401") || erros[0].includes("403")) {
+      dividendsStatusText.textContent = "A chave do Dados B3 não foi aceita. Confira DADOSB3_API_KEY no Netlify.";
+    } else {
+      dividendsStatusText.textContent = erros.slice(0, 2).join(" · ");
+    }
   } else {
-    dividendsStatusTitle.textContent = `${atualizados} ativo(s) com dividendos atualizados`;
-    dividendsStatusText.textContent = "Valores estimados usando sua quantidade registrada na data-com de cada evento.";
+    dividendsStatusTitle.textContent = `${eventosImportados} provento(s) importado(s)`;
+    dividendsStatusText.textContent = `${atualizados} ativo(s) consultado(s) no Dados B3. Totais consideram apenas pagamentos com data informada e já ocorridos.`;
   }
 }
-
 
 function rotuloTipoMovimentacao(tipo) {
   if (tipo === "venda") return "Venda";

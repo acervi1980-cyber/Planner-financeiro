@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#134e3a">
-  <title>Planner Financeiro · v1.9.15</title>
+  <title>Planner Financeiro · v1.9.16</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +32,7 @@
 
       <div class="sidebar-footer">
         <small>Planner Financeiro</small>
-        <span>Versão 1.9.15 · Ticker B3 no cadastro + dividendos reais</span>
+        <span>Versão 1.9.16 · Dividendos via Dados B3</span>
       </div>
     </aside>
 
@@ -378,7 +378,7 @@
           <div class="panel-header portfolio-header">
             <div>
               <h3>Dividendos e proventos</h3>
-              <small>Eventos reais importados da B3 e valores estimados para a sua posição histórica</small>
+              <small>Proventos importados do Dados B3 e valores estimados para a sua posição histórica</small>
             </div>
             <div class="data-actions">
               <button type="button" class="quote-update-button compact-button" id="btnAtualizarDividendos">↻ Atualizar dividendos</button>
@@ -387,7 +387,7 @@
 
           <div class="dividends-status" id="dividendsStatus" aria-live="polite">
             <strong id="dividendsStatusTitle">Dividendos prontos para consulta</strong>
-            <span id="dividendsStatusText">O Planner usa a BRAPI para ações e FIIs brasileiros. A disponibilidade depende do plano da sua chave BRAPI.</span>
+            <span id="dividendsStatusText">O Planner usa o Dados B3 para importar proventos de ações e FIIs brasileiros.</span>
           </div>
 
           <section class="passive-summary dividends-summary" aria-label="Resumo de dividendos recebidos">
